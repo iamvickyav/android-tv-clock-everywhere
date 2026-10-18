@@ -26,12 +26,30 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Configure persistent debug signing
+        env:
+          CLOCK_DEBUG_KEYSTORE_B64: ${{ secrets.CLOCK_DEBUG_KEYSTORE_B64 }}
+          CLOCK_DEBUG_STORE_PASSWORD: ${{ secrets.CLOCK_DEBUG_STORE_PASSWORD }}
+          CLOCK_DEBUG_KEY_ALIAS: ${{ secrets.CLOCK_DEBUG_KEY_ALIAS }}
+          CLOCK_DEBUG_KEY_PASSWORD: ${{ secrets.CLOCK_DEBUG_KEY_PASSWORD }}
+        run: |
+          test -n "$CLOCK_DEBUG_KEYSTORE_B64" || (echo "Missing CLOCK_DEBUG_KEYSTORE_B64 repository secret" && exit 1)
+          mkdir -p "$RUNNER_TEMP/clock-signing"
+          printf '%s' "$CLOCK_DEBUG_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/clock-signing/debug.keystore"
+          echo "CLOCK_DEBUG_KEYSTORE_PATH=$RUNNER_TEMP/clock-signing/debug.keystore" >> "$GITHUB_ENV"
+          echo "CLOCK_DEBUG_STORE_PASSWORD=$CLOCK_DEBUG_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "CLOCK_DEBUG_KEY_ALIAS=$CLOCK_DEBUG_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "CLOCK_DEBUG_KEY_PASSWORD=$CLOCK_DEBUG_KEY_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Upload APK
+      - name: Rename debug APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/clock-everywhere-1.0.0-debug.apk
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: clock-everywhere-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: clock-everywhere-1.0.0-debug
+          path: app/build/outputs/apk/debug/clock-everywhere-1.0.0-debug.apk
           if-no-files-found: error

@@ -1,6 +1,11 @@
 # Clock Everywhere
 
-A lightweight Android TV clock overlay that stays visible above other apps.
+A lightweight Android TV clock overlay that stays visible above every other app.
+
+<img width="500" height="500" alt="2" src="https://github.com/user-attachments/assets/6d630e98-791c-4734-9157-8e0794faebec" />
+
+<img width="500" height="500" alt="1" src="https://github.com/user-attachments/assets/2aaa44b3-5d9e-4d36-907f-a62425be4d4a" />
+
 
 ## Download
 
@@ -14,9 +19,9 @@ For development/testing, download the latest APK from GitHub Actions:
 4. Download the `clock-everywhere-1.0.0-debug` artifact.
 5. Extract the ZIP and install the APK on your Android TV.
 
-urlGitHub Repositoryhttps://github.com/iamvickyav/android-tv-clock-everywhere
+GitHub Repository - https://github.com/iamvickyav/android-tv-clock-everywhere
 
-urlDownload Builds from GitHub Actionshttps://github.com/iamvickyav/android-tv-clock-everywhere/actions/workflows/build.yml
+Download Builds from GitHub Actions - https://github.com/iamvickyav/android-tv-clock-everywhere/actions/workflows/build.yml
 
 ### Release build
 

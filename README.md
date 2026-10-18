@@ -2,9 +2,9 @@
 
 A lightweight Android TV clock overlay that stays visible above every other app.
 
-<img width="500" height="500" alt="2" src="https://github.com/user-attachments/assets/6d630e98-791c-4734-9157-8e0794faebec" />
+<img width="800" height="500" alt="2" src="https://github.com/user-attachments/assets/6d630e98-791c-4734-9157-8e0794faebec" />
 
-<img width="500" height="500" alt="1" src="https://github.com/user-attachments/assets/2aaa44b3-5d9e-4d36-907f-a62425be4d4a" />
+<img width="800" height="500" alt="1" src="https://github.com/user-attachments/assets/2aaa44b3-5d9e-4d36-907f-a62425be4d4a" />
 
 
 ## Download

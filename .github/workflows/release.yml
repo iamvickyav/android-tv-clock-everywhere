@@ -1,0 +1,71 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (for example v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.9'
+
+      - name: Configure release signing
+        env:
+          CLOCK_RELEASE_KEYSTORE_B64: ${{ secrets.CLOCK_RELEASE_KEYSTORE_B64 }}
+          CLOCK_RELEASE_STORE_PASSWORD: ${{ secrets.CLOCK_RELEASE_STORE_PASSWORD }}
+          CLOCK_RELEASE_KEY_ALIAS: ${{ secrets.CLOCK_RELEASE_KEY_ALIAS }}
+          CLOCK_RELEASE_KEY_PASSWORD: ${{ secrets.CLOCK_RELEASE_KEY_PASSWORD }}
+        run: |
+          test -n "$CLOCK_RELEASE_KEYSTORE_B64" || (echo "Missing CLOCK_RELEASE_KEYSTORE_B64 repository secret" && exit 1)
+          mkdir -p "$RUNNER_TEMP/clock-signing"
+          printf '%s' "$CLOCK_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/clock-signing/release.keystore"
+          echo "CLOCK_RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/clock-signing/release.keystore" >> "$GITHUB_ENV"
+          echo "CLOCK_RELEASE_STORE_PASSWORD=$CLOCK_RELEASE_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "CLOCK_RELEASE_KEY_ALIAS=$CLOCK_RELEASE_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "CLOCK_RELEASE_KEY_PASSWORD=$CLOCK_RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: gradle --no-daemon assembleRelease
+
+      - name: Prepare release APK
+        run: cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/clock-everywhere-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}.apk
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: clock-everywhere-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          path: app/build/outputs/apk/release/clock-everywhere-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}.apk
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "app/build/outputs/apk/release/clock-everywhere-${RELEASE_TAG}.apk" \
+            --title "Clock Everywhere ${RELEASE_TAG#v}" \
+            --generate-notes

@@ -2,256 +2,39 @@
 
 A lightweight Android TV clock overlay that stays visible above other apps.
 
-## Current behavior
+## Download
 
-- Top-right overlay
-- `HH:mm:ss` by default
-- Click-through / non-touchable overlay
-- Display-over-other-apps permission
-- Starts on TV boot when enabled
-- Android TV launcher entry: **Clock Everywhere**
-- Settings are persisted locally on the TV
+### Latest debug build
 
-## Android compatibility
-
-| Setting | Version |
-|---|---|
-| Minimum Android | Android 8.0 (API 26) |
-| Recommended / tested device | Android 10 (API 29) |
-| Compile SDK | API 35 |
-| Current target SDK | API 28 |
-
-`minSdk = 26` is the minimum supported version for this project. The app therefore requires Android 8.0 or newer. The current target/compile settings are independent of the minimum version.
-
-### Known test TV
-
-```text
-Model:          MiTV-MOOQ
-Android:        10
-SDK:            29
-Kernel:         4.19.79+
-Build:          Qt63.200305.006.5283
-Security patch: 2022-08-05
-```
-
-## Build variants and signing
-
-Clock Everywhere has separate debug and release identities:
-
-| Variant | Application ID | Version | Signing | Purpose |
-|---|---|---|---|---|
-| Debug | `com.vicky.clockeverywhere.debug` | `1.0.0-debug` | Persistent debug key | Development/testing |
-| Release | `com.vicky.clockeverywhere` | `1.0.0` | Persistent release key | Stable releases |
-
-The debug and release variants can be installed on the TV at the same time because they use different application IDs.
-
-**Important:** the debug signing key must remain the same for every debug build. Otherwise Android will report `INSTALL_FAILED_UPDATE_INCOMPATIBLE` and require an uninstall.
-
-GitHub Actions reads the debug signing key from repository secrets:
-
-```text
-CLOCK_DEBUG_KEYSTORE_B64
-CLOCK_DEBUG_STORE_PASSWORD
-CLOCK_DEBUG_KEY_ALIAS
-CLOCK_DEBUG_KEY_PASSWORD
-```
-
-Release signing is reserved for the release workflow and uses:
-
-```text
-CLOCK_RELEASE_KEYSTORE_PATH
-CLOCK_RELEASE_STORE_PASSWORD
-CLOCK_RELEASE_KEY_ALIAS
-CLOCK_RELEASE_KEY_PASSWORD
-```
-
-Never commit the release keystore or release passwords to the repository.
-
-### One-time debug signing setup
-
-Generate a persistent debug keystore locally:
-
-```bash
-keytool -genkeypair \
-  -v \
-  -keystore clock-everywhere-debug.keystore \
-  -storepass clockdebug \
-  -alias clockdebug \
-  -keypass clockdebug \
-  -keyalg RSA \
-  -keysize 2048 \
-  -validity 10000 \
-  -dname "CN=Clock Everywhere Debug, OU=Development, O=Clock Everywhere, C=IN"
-```
-
-Convert it to Base64:
-
-```bash
-base64 < clock-everywhere-debug.keystore | tr -d '\\n'
-```
-
-Add the resulting value to the repository's GitHub Actions secrets as `CLOCK_DEBUG_KEYSTORE_B64`, along with the three debug password/alias secrets above.
-
-After this is configured, every GitHub Actions debug APK is signed with the same key and can be updated with:
-
-```bash
-adb install -r clock-everywhere-1.0.0-debug.apk
-```
-
-### Important migration note
-
-The currently installed test APK may have been signed with an older ephemeral key. That installation must be removed **once** before installing the first APK signed with the new persistent debug key:
-
-```bash
-adb uninstall com.vicky.clockeverywhere
-```
-
-After that one-time migration, future debug builds do not require uninstalling.
-
-## Installation
-
-There are three ways to install Clock Everywhere on an Android TV.
-
-### 1. Download APK from GitHub Actions
-
-The project automatically builds a debug APK using GitHub Actions whenever code is pushed to `main`.
+For development/testing, download the latest APK from GitHub Actions:
 
 1. Open the repository's **Actions** tab.
 2. Select the **Build APK** workflow.
 3. Open the latest successful workflow run.
-4. Scroll to **Artifacts**.
-5. Download the `clock-everywhere-1.0.0-debug` artifact.
-6. Extract the downloaded ZIP and use the APK inside it.
+4. Download the `clock-everywhere-1.0.0-debug` artifact.
+5. Extract the ZIP and install the APK on your Android TV.
 
-Repository:
+urlGitHub Repositoryhttps://github.com/iamvickyav/android-tv-clock-everywhere
 
-https://github.com/iamvickyav/android-tv-clock-everywhere
+urlDownload Builds from GitHub Actionshttps://github.com/iamvickyav/android-tv-clock-everywhere/actions/workflows/build.yml
 
-Builds:
+### Release build
 
-https://github.com/iamvickyav/android-tv-clock-everywhere/actions/workflows/build.yml
+Stable release APKs will be published through GitHub Releases once the first release is locked.
 
-### 2. Install using ADB — recommended for development/testing
+## Features
 
-#### Enable Developer Options
-
-On the TV:
-
-**Settings → Device Preferences → About → Build**
-
-Press **Build 7 times** to enable Developer Options.
-
-Enable ADB / network debugging if available.
-
-#### Find the TV IP address
-
-On the TV, open:
-
-**Settings → Network & Internet → your connected network**
-
-Example:
-
-```text
-192.168.1.42
-```
-
-The TV and computer must be on the same network.
-
-#### Install Android platform tools on Mac
-
-```bash
-brew install android-platform-tools
-adb version
-```
-
-#### Connect to the TV
-
-```bash
-adb connect <TV_IP>:5555
-adb devices
-```
-
-Accept the debugging prompt on the TV if shown.
-
-#### Install the debug APK
-
-```bash
-adb install -r clock-everywhere-1.0.0-debug.apk
-```
-
-The `-r` option updates the existing **debug** installation without uninstalling it.
-
-### Xiaomi / Android package verification
-
-Some Xiaomi Android TV builds may reject a sideload with:
-
-```text
-INSTALL_FAILED_VERIFICATION_FAILURE
-```
-
-On the test MiTV-MOOQ device, disabling Android package verification temporarily allowed installation:
-
-```bash
-adb shell settings put global package_verifier_enable 0
-adb install -r clock-everywhere-1.0.0-debug.apk
-adb shell settings put global package_verifier_enable 1
-```
-
-Verify the final value is `1`:
-
-```bash
-adb shell settings get global package_verifier_enable
-```
-
-Only use this workaround for an APK you trust.
-
-### 3. Install using a USB drive — easiest for normal TV use
-
-This method does not require a computer-to-TV ADB connection.
-
-1. Download the latest APK from the **Build APK** GitHub Actions artifact on a computer.
-2. Extract the downloaded artifact ZIP.
-3. Copy the APK to a USB flash drive.
-4. Insert the USB drive into the Xiaomi TV.
-5. Open the TV's file manager / USB storage browser.
-6. Select the Clock Everywhere APK.
-7. If the TV asks for permission to install apps from that source, allow it.
-8. Confirm installation.
-9. Open **Clock Everywhere** from the TV app list.
-
-If the TV blocks installation from the file manager, enable the relevant **Install unknown apps** permission for that file manager and retry.
-
-> USB installation is the simplest option when you just want to install a released/test APK. ADB is more convenient when developing and repeatedly updating the app.
-
-## First-time TV setup
-
-After installing the APK:
-
-1. Open **Clock Everywhere** from the TV app list.
-2. Grant:
-   **Settings → Apps → Special app access → Display over other apps → Clock Everywhere → Allow**
-3. Return to Clock Everywhere.
-4. Enable the app.
-5. The clock should appear in the top-right corner.
-
-## Build locally
-
-From the repository root:
-
-```bash
-./gradlew assembleDebug
-```
-
-APK output:
-
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-For local debug builds, configure the same persistent debug keystore environment variables if you need APKs to update an existing installation.
+- Clock displayed in the top-right corner.
+- 24-hour `HH:mm:ss` display.
+- Runs above other apps using Android's display-over-other-apps permission.
+- Click-through / non-touchable overlay.
+- Automatically starts after TV boot when enabled.
+- Settings are persisted locally on the TV.
+- Android TV launcher entry: **Clock Everywhere**.
+- Separate debug and release app identities for safe development and testing.
 
 ## Roadmap
 
-- Hourly highlight: subtle glow/color animation for 10 seconds at `HH:00:00`
-- Configurable clock size/position
-- Additional display options as needed
+- Hourly highlight: subtle glow/color animation for 10 seconds at `HH:00:00`.
+- Configurable clock size/position.
+- Additional display options as needed.

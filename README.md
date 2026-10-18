@@ -35,6 +35,7 @@ Stable release APKs will be published through GitHub Releases once the first rel
 - Click-through / non-touchable overlay.
 - Automatically starts after TV boot when enabled.
 - Starts from device-protected settings before the TV is unlocked (after the settings have been migrated on first launch/update).
+- Includes a separate Android DreamService flip-clock screensaver.
 - Settings are persisted locally on the TV.
 - Android TV launcher entry: **Clock Everywhere**.
 - Separate debug and release app identities for safe development and testing.
@@ -44,3 +45,7 @@ Stable release APKs will be published through GitHub Releases once the first rel
 - Hourly highlight: subtle glow/color animation for 10 seconds at `HH:00:00`.
 - Configurable clock size/position.
 - Additional display options as needed.
+
+## Flip-clock screensaver
+
+To use the full-screen flip clock, open the TV's **Settings → Device Preferences → Screen saver** (the exact menu name varies by manufacturer), choose **Clock Everywhere Flip Clock**, and configure the TV's own screensaver timeout. The screensaver uses the app's existing 12/24-hour and timezone choices. Some TV firmware may hide third-party screensavers or use a different settings path.

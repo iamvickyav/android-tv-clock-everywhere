@@ -24,7 +24,7 @@ Security patch: 2022-08-05
 | Minimum Android | Android 8.0 (API 26) |
 | Recommended / tested device | Android 10 (API 29) |
 | Compile SDK | API 35 |
-| Current target SDK | API 28 |
+| Current target SDK | API 34 |
 
 `minSdk = 26` is the minimum supported version. Do not raise it without an explicit product decision.
 
@@ -34,14 +34,28 @@ Core components include:
 
 - `MainActivity` — settings/configuration UI.
 - `ClockOverlayService` — owns the always-on-top clock overlay.
+- `ClockDreamService` — independent full-screen Android screensaver using the existing 12/24-hour and timezone preferences.
+- `FlipClockView` — lays out a responsive centered row of six digit cards and two static colon separators.
+- `FlipDigitView` — renders and independently animates one digit card.
+- `ClockTimeFormatter` — formats actual wall-clock time into six digits using the configured timezone.
 - `BootReceiver` — handles boot broadcasts and starts the overlay when the app is enabled and the overlay permission is available.
-- Android manifest — declares the overlay permission, boot receiver, service, and Android TV launcher entry.
+- Android manifest — declares the overlay permission, boot receiver, services, Android TV launcher entry, and DreamService metadata.
 
 The app should not open its settings Activity automatically at TV boot. Boot should start the overlay service only when configured to do so.
 
 The overlay should remain click-through/non-touchable so it does not interfere with the application underneath it.
 
 The overlay requires Android's `SYSTEM_ALERT_WINDOW` / Display over other apps permission.
+
+### Flip-clock screensaver
+
+`ClockDreamService` is registered using the `android.service.dreams.DreamService` action, the `android.permission.BIND_DREAM_SERVICE` permission, and `@xml/clock_dream` metadata. Android TV controls activation; the app must not add an inactivity timer. To configure it on a TV, open **Settings → Device Preferences → Screen saver** (manufacturer menu names vary) and choose **Clock Everywhere Flip Clock**. Some manufacturers may hide third-party DreamService implementations or expose the selector elsewhere.
+
+The dream uses a black full-screen background and a centered, width/height-constrained horizontal layout. It reads the existing `24_hour` and `timezone` values from `ClockPreferences`; seconds are always shown. Twelve-hour mode includes the clock's AM/PM marker. `ClockTimeFormatter` recalculates all six digits from `System.currentTimeMillis()` at each actual second boundary. `FlipClockView` updates each digit only when its value differs. `FlipDigitView` uses a 400 ms native `ValueAnimator` and a `Camera`/`Matrix` rotationX transform around the card's horizontal hinge. Stopping/detaching the dream cancels the handler callback, unregisters the preference listener, and cancels digit animations.
+
+The bundled `app/src/main/assets/fonts/DSEG7Classic-Bold.ttf` is the DSEG7 Classic Bold digital display font. It is distributed under SIL Open Font License 1.1; retain the adjacent `DSEG-LICENSE.txt` when distributing the application.
+
+Run `./gradlew testDebugUnitTest` for 12/24-hour formatting, second/minute/hour rollovers, midnight, and changed-digit assertions. Verify DreamService activation and exit on physical target TVs; Android's API-level support does not guarantee that each TV manufacturer's settings UI exposes third-party dreams.
 
 ## TV launcher assets
 
@@ -158,6 +172,7 @@ From the repository root:
 
 ```bash
 ./gradlew assembleDebug
+./gradlew testDebugUnitTest
 ```
 
 APK output:
@@ -167,6 +182,8 @@ app/build/outputs/apk/debug/app-debug.apk
 ```
 
 For updates to an existing debug installation, the local build must use the same persistent debug signing key.
+
+The current checkout may require the Gradle wrapper script to be restored if it is absent. The wrapper distribution is pinned in `gradle/wrapper/gradle-wrapper.properties`; do not upgrade Gradle or the Android Gradle Plugin as part of an application feature.
 
 ## GitHub Actions
 

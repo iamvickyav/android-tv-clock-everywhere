@@ -34,6 +34,80 @@ Build:          Qt63.200305.006.5283
 Security patch: 2022-08-05
 ```
 
+## Build variants and signing
+
+Clock Everywhere has separate debug and release identities:
+
+| Variant | Application ID | Version | Signing | Purpose |
+|---|---|---|---|---|
+| Debug | `com.vicky.clockeverywhere.debug` | `1.0.0-debug` | Persistent debug key | Development/testing |
+| Release | `com.vicky.clockeverywhere` | `1.0.0` | Persistent release key | Stable releases |
+
+The debug and release variants can be installed on the TV at the same time because they use different application IDs.
+
+**Important:** the debug signing key must remain the same for every debug build. Otherwise Android will report `INSTALL_FAILED_UPDATE_INCOMPATIBLE` and require an uninstall.
+
+GitHub Actions reads the debug signing key from repository secrets:
+
+```text
+CLOCK_DEBUG_KEYSTORE_B64
+CLOCK_DEBUG_STORE_PASSWORD
+CLOCK_DEBUG_KEY_ALIAS
+CLOCK_DEBUG_KEY_PASSWORD
+```
+
+Release signing is reserved for the release workflow and uses:
+
+```text
+CLOCK_RELEASE_KEYSTORE_PATH
+CLOCK_RELEASE_STORE_PASSWORD
+CLOCK_RELEASE_KEY_ALIAS
+CLOCK_RELEASE_KEY_PASSWORD
+```
+
+Never commit the release keystore or release passwords to the repository.
+
+### One-time debug signing setup
+
+Generate a persistent debug keystore locally:
+
+```bash
+keytool -genkeypair \
+  -v \
+  -keystore clock-everywhere-debug.keystore \
+  -storepass clockdebug \
+  -alias clockdebug \
+  -keypass clockdebug \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 10000 \
+  -dname "CN=Clock Everywhere Debug, OU=Development, O=Clock Everywhere, C=IN"
+```
+
+Convert it to Base64:
+
+```bash
+base64 < clock-everywhere-debug.keystore | tr -d '\\n'
+```
+
+Add the resulting value to the repository's GitHub Actions secrets as `CLOCK_DEBUG_KEYSTORE_B64`, along with the three debug password/alias secrets above.
+
+After this is configured, every GitHub Actions debug APK is signed with the same key and can be updated with:
+
+```bash
+adb install -r clock-everywhere-1.0.0-debug.apk
+```
+
+### Important migration note
+
+The currently installed test APK may have been signed with an older ephemeral key. That installation must be removed **once** before installing the first APK signed with the new persistent debug key:
+
+```bash
+adb uninstall com.vicky.clockeverywhere
+```
+
+After that one-time migration, future debug builds do not require uninstalling.
+
 ## Installation
 
 There are three ways to install Clock Everywhere on an Android TV.
@@ -46,7 +120,7 @@ The project automatically builds a debug APK using GitHub Actions whenever code 
 2. Select the **Build APK** workflow.
 3. Open the latest successful workflow run.
 4. Scroll to **Artifacts**.
-5. Download the APK artifact.
+5. Download the `clock-everywhere-1.0.0-debug` artifact.
 6. Extract the downloaded ZIP and use the APK inside it.
 
 Repository:
@@ -56,8 +130,6 @@ https://github.com/iamvickyav/android-tv-clock-everywhere
 Builds:
 
 https://github.com/iamvickyav/android-tv-clock-everywhere/actions/workflows/build.yml
-
-> For a normal TV installation, the APK artifact from the latest successful build is the recommended download.
 
 ### 2. Install using ADB — recommended for development/testing
 
@@ -101,13 +173,13 @@ adb devices
 
 Accept the debugging prompt on the TV if shown.
 
-#### Install the APK
+#### Install the debug APK
 
 ```bash
-adb install -r clock-everywhere.apk
+adb install -r clock-everywhere-1.0.0-debug.apk
 ```
 
-The `-r` option updates an existing installation without uninstalling it.
+The `-r` option updates the existing **debug** installation without uninstalling it.
 
 ### Xiaomi / Android package verification
 
@@ -121,7 +193,7 @@ On the test MiTV-MOOQ device, disabling Android package verification temporarily
 
 ```bash
 adb shell settings put global package_verifier_enable 0
-adb install -r clock-everywhere.apk
+adb install -r clock-everywhere-1.0.0-debug.apk
 adb shell settings put global package_verifier_enable 1
 ```
 
@@ -176,7 +248,7 @@ APK output:
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The repository also contains a GitHub Actions workflow that builds and uploads the debug APK automatically.
+For local debug builds, configure the same persistent debug keystore environment variables if you need APKs to update an existing installation.
 
 ## Roadmap
 

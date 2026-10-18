@@ -1,6 +1,10 @@
 package com.vicky.clockeverywhere;
 
 import android.app.ActivityManager;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
@@ -8,6 +12,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -28,6 +33,8 @@ public class ClockOverlayService extends Service {
     private static final String KEY_24_HOUR = "24_hour";
     private static final String KEY_SHOW_TZ = "show_timezone";
     private static final String KEY_TIMEZONE = "timezone";
+    private static final String CHANNEL_ID = "clock_everywhere_service";
+    private static final int NOTIFICATION_ID = 1001;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView clockView;
@@ -66,6 +73,9 @@ public class ClockOverlayService extends Service {
             return;
         }
 
+        createNotificationChannel();
+        startForeground(NOTIFICATION_ID, buildNotification());
+
         try {
             windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             clockView = new TextView(this);
@@ -94,13 +104,49 @@ public class ClockOverlayService extends Service {
             viewAdded = true;
             handler.post(ticker);
         } catch (Exception e) {
-            // A TV firmware can report overlay permission as granted while its
-            // window manager is still rejecting the overlay. Never crash the UI.
             viewAdded = false;
             clockView = null;
+            stopForeground(true);
             prefs.edit().putBoolean(KEY_ENABLED, false).apply();
             stopSelf();
         }
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Clock Everywhere",
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("Keeps the Clock Everywhere overlay running");
+            channel.setShowBadge(false);
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.createNotificationChannel(channel);
+        }
+    }
+
+    private Notification buildNotification() {
+        Intent launchIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+                        | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0));
+
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, CHANNEL_ID)
+                : new Notification.Builder(this);
+
+        return builder
+                .setContentTitle("Clock Everywhere")
+                .setContentText("Clock overlay is running")
+                .setSmallIcon(android.R.drawable.ic_menu_recent_history)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setShowWhen(false)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .build();
     }
 
     private boolean isHomeScreen() {
@@ -121,6 +167,7 @@ public class ClockOverlayService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (!prefs.getBoolean(KEY_ENABLED, false)) {
+            stopForeground(true);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -132,6 +179,7 @@ public class ClockOverlayService extends Service {
         if (clockView != null && windowManager != null && viewAdded) {
             try { windowManager.removeView(clockView); } catch (Exception ignored) { }
         }
+        stopForeground(true);
         viewAdded = false;
         clockView = null;
         super.onDestroy();

@@ -29,6 +29,7 @@ Stable release APKs will be published through GitHub Releases once the first rel
 - Runs above other apps using Android's display-over-other-apps permission.
 - Click-through / non-touchable overlay.
 - Automatically starts after TV boot when enabled.
+- Starts from device-protected settings before the TV is unlocked (after the settings have been migrated on first launch/update).
 - Settings are persisted locally on the TV.
 - Android TV launcher entry: **Clock Everywhere**.
 - Separate debug and release app identities for safe development and testing.

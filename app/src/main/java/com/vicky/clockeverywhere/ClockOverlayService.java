@@ -27,7 +27,6 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 public class ClockOverlayService extends Service {
-    private static final String PREFS = "clock_everywhere";
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_SHOW_HOME = "show_home";
     private static final String KEY_24_HOUR = "24_hour";
@@ -67,7 +66,7 @@ public class ClockOverlayService extends Service {
 
     @Override public void onCreate() {
         super.onCreate();
-        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        prefs = ClockPreferences.get(this);
         if (!prefs.getBoolean(KEY_ENABLED, false) || !Settings.canDrawOverlays(this)) {
             stopSelf();
             return;

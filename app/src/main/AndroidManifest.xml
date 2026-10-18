@@ -27,11 +27,13 @@
 
         <service
             android:name=".ClockOverlayService"
+            android:directBootAware="true"
             android:exported="false" />
 
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
+            android:directBootAware="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

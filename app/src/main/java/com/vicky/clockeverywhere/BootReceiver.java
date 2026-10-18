@@ -19,8 +19,8 @@ public class BootReceiver extends BroadcastReceiver {
             return;
         }
 
-        SharedPreferences prefs = context.getSharedPreferences("clock_everywhere", Context.MODE_PRIVATE);
-        boolean enabled = prefs.getBoolean("enabled", true);
+        SharedPreferences prefs = ClockPreferences.get(context);
+        boolean enabled = prefs.getBoolean("enabled", false);
         boolean overlayAllowed = Settings.canDrawOverlays(context);
 
         Log.i(TAG, "Boot received: action=" + action

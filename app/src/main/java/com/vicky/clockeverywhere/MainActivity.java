@@ -26,7 +26,6 @@ import java.util.TimeZone;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_OVERLAY = 1001;
-    private static final String PREFS = "clock_everywhere";
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_SHOW_HOME = "show_home";
     private static final String KEY_24_HOUR = "24_hour";
@@ -43,7 +42,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        prefs = ClockPreferences.get(this);
         buildScreen();
     }
 

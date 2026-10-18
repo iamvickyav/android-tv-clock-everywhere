@@ -14,9 +14,42 @@ android {
         versionName '1.0.0'
     }
 
+    signingConfigs {
+        debugPersistent {
+            def debugKeystore = file("$rootDir/.gradle/clock-everywhere-debug.keystore")
+            if (!debugKeystore.exists()) {
+                exec {
+                    commandLine 'bash', '-c', "mkdir -p '$rootDir/.gradle' && base64 --decode '$rootDir/.github/clock-everywhere-debug.keystore.b64' > '${debugKeystore.absolutePath}'"
+                }
+            }
+            storeFile debugKeystore
+            storePassword 'clockdebug'
+            keyAlias 'clockdebug'
+            keyPassword 'clockdebug'
+        }
+
+        release {
+            def keystorePath = System.getenv('CLOCK_RELEASE_KEYSTORE_PATH')
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('CLOCK_RELEASE_STORE_PASSWORD')
+                keyAlias System.getenv('CLOCK_RELEASE_KEY_ALIAS')
+                keyPassword System.getenv('CLOCK_RELEASE_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+            signingConfig signingConfigs.debugPersistent
+        }
         release {
             minifyEnabled false
+            if (System.getenv('CLOCK_RELEASE_KEYSTORE_PATH')) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

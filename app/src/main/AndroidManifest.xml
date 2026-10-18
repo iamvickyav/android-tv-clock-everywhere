@@ -6,12 +6,12 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
-        android:theme="@style/AppTheme"
-        android:label="Clock Everywhere"
-        android:icon="@drawable/ic_clock"
-        android:banner="@drawable/banner"
-        android:allowBackup="false"
-        android:supportsRtl="true">
+    android:theme="@style/AppTheme"
+    android:label="Clock Everywhere"
+    android:icon="@mipmap/ic_launcher"
+    android:banner="@mipmap/banner"
+    android:allowBackup="false"
+    android:supportsRtl="true">
 
         <activity
             android:name=".MainActivity"

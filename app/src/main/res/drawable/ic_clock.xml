@@ -1,7 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="512dp" android:height="512dp" android:viewportWidth="512" android:viewportHeight="512">
-    <path android:fillColor="#101316" android:pathData="M0,0h512v512H0z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M256,64a192,192 0,1 1,0 384a192,192 0,1 1,0 -384M256,88a168,168 0,1 0,0 336a168,168 0,1 0,0 -336" />
-    <path android:fillColor="#FFFFFF" android:pathData="M247,112h18v120h-18zM256,224L350,292l-14,20L242,244z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M247,88h18v40h-18zM247,384h18v40h-18zM88,247h40v18H88zM384,247h40v18h-40z" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Transparent background: Android TV supplies the launcher tile background. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M256,64a192,192 0,1 1,0 384a192,192 0,1 1,0 -384M256,88a168,168 0,1 0,0 336a168,168 0,1 0,0 -336" />
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M247,112h18v120h-18zM256,224L350,292l-14,20L242,244z" />
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M247,88h18v40h-18zM247,384h18v40h-18zM88,247h40v18H88zM384,247h40v18h-40z" />
 </vector>

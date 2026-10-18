@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.WindowManager;
@@ -28,15 +29,16 @@ public class ClockOverlayService extends Service {
     private static final String KEY_SHOW_TZ = "show_timezone";
     private static final String KEY_TIMEZONE = "timezone";
 
-    private final Handler handler = new Handler();
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView clockView;
     private WindowManager windowManager;
     private SharedPreferences prefs;
+    private boolean viewAdded;
 
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
-            if (clockView == null) return;
-            if (!prefs.getBoolean(KEY_ENABLED, true)) {
+            if (clockView == null || !viewAdded) return;
+            if (!prefs.getBoolean(KEY_ENABLED, false)) {
                 stopSelf();
                 return;
             }
@@ -59,36 +61,46 @@ public class ClockOverlayService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        if (!prefs.getBoolean(KEY_ENABLED, true) || !Settings.canDrawOverlays(this)) {
+        if (!prefs.getBoolean(KEY_ENABLED, false) || !Settings.canDrawOverlays(this)) {
             stopSelf();
             return;
         }
 
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        clockView = new TextView(this);
-        clockView.setTextColor(Color.WHITE);
-        clockView.setTextSize(18);
-        clockView.setTypeface(Typeface.create("sans", Typeface.NORMAL));
-        clockView.setShadowLayer(4f, 2f, 2f, Color.BLACK);
-        clockView.setPadding(8, 4, 8, 4);
-        clockView.setClickable(false);
-        clockView.setFocusable(false);
-        clockView.setFocusableInTouchMode(false);
+        try {
+            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            clockView = new TextView(this);
+            clockView.setTextColor(Color.WHITE);
+            clockView.setTextSize(18);
+            clockView.setTypeface(Typeface.create("sans", Typeface.NORMAL));
+            clockView.setShadowLayer(4f, 2f, 2f, Color.BLACK);
+            clockView.setPadding(8, 4, 8, 4);
+            clockView.setClickable(false);
+            clockView.setFocusable(false);
+            clockView.setFocusableInTouchMode(false);
 
-        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                android.graphics.PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | Gravity.RIGHT;
-        params.x = 24;
-        params.y = 18;
+            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    android.graphics.PixelFormat.TRANSLUCENT);
+            params.gravity = Gravity.TOP | Gravity.RIGHT;
+            params.x = 24;
+            params.y = 18;
 
-        windowManager.addView(clockView, params);
-        handler.post(ticker);
+            windowManager.addView(clockView, params);
+            viewAdded = true;
+            handler.post(ticker);
+        } catch (Exception e) {
+            // A TV firmware can report overlay permission as granted while its
+            // window manager is still rejecting the overlay. Never crash the UI.
+            viewAdded = false;
+            clockView = null;
+            prefs.edit().putBoolean(KEY_ENABLED, false).apply();
+            stopSelf();
+        }
     }
 
     private boolean isHomeScreen() {
@@ -108,7 +120,7 @@ public class ClockOverlayService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (!prefs.getBoolean(KEY_ENABLED, true)) {
+        if (!prefs.getBoolean(KEY_ENABLED, false)) {
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -117,9 +129,10 @@ public class ClockOverlayService extends Service {
 
     @Override public void onDestroy() {
         handler.removeCallbacks(ticker);
-        if (clockView != null && windowManager != null) {
+        if (clockView != null && windowManager != null && viewAdded) {
             try { windowManager.removeView(clockView); } catch (Exception ignored) { }
         }
+        viewAdded = false;
         clockView = null;
         super.onDestroy();
     }

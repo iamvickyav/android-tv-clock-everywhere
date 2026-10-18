@@ -41,23 +41,17 @@ public class MainActivity extends Activity {
     private Spinner timezoneSpinner;
     private boolean waitingForOverlayPermission;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         buildScreen();
     }
 
-    @Override
-    protected void onResume() {
+    @Override protected void onResume() {
         super.onResume();
-        // Some Android TV firmware does not reliably deliver a useful result code
-        // from the overlay settings screen. Check the actual permission state here.
         if (waitingForOverlayPermission && Settings.canDrawOverlays(this)) {
             waitingForOverlayPermission = false;
-            if (enabledSwitch != null && enabledSwitch.isChecked()) {
-                startClockSafely();
-            }
+            if (enabledSwitch != null && enabledSwitch.isChecked()) startClockSafely();
         }
     }
 
@@ -86,16 +80,7 @@ public class MainActivity extends Activity {
                 stopClockSafely();
             } else if (!Settings.canDrawOverlays(this)) {
                 waitingForOverlayPermission = true;
-                try {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + getPackageName()));
-                    startActivityForResult(intent, REQUEST_OVERLAY);
-                } catch (Exception e) {
-                    waitingForOverlayPermission = false;
-                    prefs.edit().putBoolean(KEY_ENABLED, false).apply();
-                    enabledSwitch.setChecked(false);
-                    Toast.makeText(this, "Open Display over other apps and allow Clock Everywhere.", Toast.LENGTH_LONG).show();
-                }
+                openOverlaySettings();
             } else {
                 startClockSafely();
             }
@@ -126,7 +111,7 @@ public class MainActivity extends Activity {
         List<String> zones = new ArrayList<>(Arrays.asList(TimeZone.getAvailableIDs()));
         Collections.sort(zones);
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, zones) {
-            @Override public View getView(int position, android.view.View convertView, android.view.ViewGroup parent) {
+            @Override public View getView(int position, View convertView, android.view.ViewGroup parent) {
                 TextView v = (TextView) super.getView(position, convertView, parent);
                 v.setTextColor(Color.WHITE);
                 v.setTextSize(18);
@@ -154,6 +139,26 @@ public class MainActivity extends Activity {
         setContentView(scroll);
         updateSettingsEnabled();
         enabledSwitch.requestFocus();
+    }
+
+    private void openOverlaySettings() {
+        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+        try {
+            // Xiaomi/Android TV firmware may not implement the package-specific
+            // overlay settings Activity. Try the TV-safe generic screen first.
+            startActivityForResult(intent, REQUEST_OVERLAY);
+        } catch (Exception genericFailure) {
+            try {
+                Intent packageIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivityForResult(packageIntent, REQUEST_OVERLAY);
+            } catch (Exception packageFailure) {
+                waitingForOverlayPermission = false;
+                prefs.edit().putBoolean(KEY_ENABLED, false).apply();
+                enabledSwitch.setChecked(false);
+                Toast.makeText(this, "Open Display over other apps and allow Clock Everywhere.", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private Switch settingSwitch(String label, boolean checked) {
@@ -201,16 +206,22 @@ public class MainActivity extends Activity {
     }
 
     private void stopClockSafely() {
-        try {
-            stopService(new Intent(this, ClockOverlayService.class));
-        } catch (Exception ignored) { }
+        try { stopService(new Intent(this, ClockOverlayService.class)); }
+        catch (Exception ignored) { }
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_OVERLAY && Settings.canDrawOverlays(this) && enabledSwitch.isChecked()) {
-            waitingForOverlayPermission = false;
-            startClockSafely();
+        if (requestCode == REQUEST_OVERLAY) {
+            if (Settings.canDrawOverlays(this) && enabledSwitch != null && enabledSwitch.isChecked()) {
+                waitingForOverlayPermission = false;
+                startClockSafely();
+            } else {
+                waitingForOverlayPermission = false;
+                prefs.edit().putBoolean(KEY_ENABLED, false).apply();
+                if (enabledSwitch != null && enabledSwitch.isChecked()) enabledSwitch.setChecked(false);
+                updateSettingsEnabled();
+            }
         }
     }
 }

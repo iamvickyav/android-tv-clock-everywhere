@@ -27,14 +27,12 @@ import java.util.TimeZone;
 public class MainActivity extends Activity {
     private static final int REQUEST_OVERLAY = 1001;
     private static final String KEY_ENABLED = "enabled";
-    private static final String KEY_SHOW_HOME = "show_home";
     private static final String KEY_24_HOUR = "24_hour";
     private static final String KEY_SHOW_TZ = "show_timezone";
     private static final String KEY_TIMEZONE = "timezone";
 
     private SharedPreferences prefs;
     private Switch enabledSwitch;
-    private Switch homeSwitch;
     private Switch formatSwitch;
     private Switch timezoneSwitch;
     private Spinner timezoneSpinner;
@@ -89,10 +87,6 @@ public class MainActivity extends Activity {
         TextView divider = text("CLOCK SETTINGS", 13, Color.GRAY);
         divider.setPadding(0, dp(28), 0, dp(10));
         root.addView(divider, fullWidth());
-
-        homeSwitch = settingSwitch("Show on Home screen", prefs.getBoolean(KEY_SHOW_HOME, true));
-        root.addView(homeSwitch, fullWidth());
-        homeSwitch.setOnCheckedChangeListener((b, checked) -> prefs.edit().putBoolean(KEY_SHOW_HOME, checked).apply());
 
         formatSwitch = settingSwitch("24 Hour Format", prefs.getBoolean(KEY_24_HOUR, true));
         root.addView(formatSwitch, fullWidth());
@@ -187,7 +181,6 @@ public class MainActivity extends Activity {
 
     private void updateSettingsEnabled() {
         boolean enabled = enabledSwitch != null && enabledSwitch.isChecked();
-        if (homeSwitch != null) homeSwitch.setEnabled(enabled);
         if (formatSwitch != null) formatSwitch.setEnabled(enabled);
         if (timezoneSwitch != null) timezoneSwitch.setEnabled(enabled);
         if (timezoneSpinner != null) timezoneSpinner.setEnabled(enabled);

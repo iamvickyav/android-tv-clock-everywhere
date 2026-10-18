@@ -25,7 +25,6 @@ final class ClockPreferences {
     private static void copyExistingSettings(SharedPreferences source, SharedPreferences destination) {
         SharedPreferences.Editor editor = destination.edit();
         copyBoolean(source, editor, "enabled");
-        copyBoolean(source, editor, "show_home");
         copyBoolean(source, editor, "24_hour");
         copyBoolean(source, editor, "show_timezone");
         String timezone = source.getString("timezone", null);

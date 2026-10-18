@@ -1,13 +1,10 @@
 package com.vicky.clockeverywhere;
 
-import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -28,7 +25,6 @@ import java.util.TimeZone;
 
 public class ClockOverlayService extends Service {
     private static final String KEY_ENABLED = "enabled";
-    private static final String KEY_SHOW_HOME = "show_home";
     private static final String KEY_24_HOUR = "24_hour";
     private static final String KEY_SHOW_TZ = "show_timezone";
     private static final String KEY_TIMEZONE = "timezone";
@@ -48,10 +44,6 @@ public class ClockOverlayService extends Service {
                 stopSelf();
                 return;
             }
-
-            boolean showOnHome = prefs.getBoolean(KEY_SHOW_HOME, true);
-            boolean onHome = isHomeScreen();
-            clockView.setVisibility(!showOnHome && onHome ? TextView.GONE : TextView.VISIBLE);
 
             String pattern = prefs.getBoolean(KEY_24_HOUR, true) ? "HH:mm:ss" : "hh:mm:ss a";
             if (prefs.getBoolean(KEY_SHOW_TZ, false)) pattern += " z";
@@ -146,22 +138,6 @@ public class ClockOverlayService extends Service {
                 .setShowWhen(false)
                 .setCategory(Notification.CATEGORY_SERVICE)
                 .build();
-    }
-
-    private boolean isHomeScreen() {
-        try {
-            Intent homeIntent = new Intent(Intent.ACTION_MAIN);
-            homeIntent.addCategory(Intent.CATEGORY_HOME);
-            ComponentName home = homeIntent.resolveActivity(getPackageManager());
-            if (home == null) return false;
-            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            if (am == null) return false;
-            java.util.List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
-            if (tasks == null || tasks.isEmpty() || tasks.get(0).topActivity == null) return false;
-            return home.getPackageName().equals(tasks.get(0).topActivity.getPackageName());
-        } catch (Exception ignored) {
-            return false;
-        }
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {

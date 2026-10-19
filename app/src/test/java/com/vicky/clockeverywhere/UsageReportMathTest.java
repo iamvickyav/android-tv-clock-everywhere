@@ -23,13 +23,13 @@ public class UsageReportMathTest {
     }
 
     @Test public void formatsForegroundUsageForTheOverlay() {
-        assertEquals("2 Hours 3 Minutes",
+        assertEquals("2h 3m",
                 UsageReportMath.formatUsageDuration(2 * 60L * 60_000L + 3 * 60_000L));
-        assertEquals("45 Minutes", UsageReportMath.formatUsageDuration(45 * 60_000L));
-        assertEquals("1 Hour", UsageReportMath.formatUsageDuration(60 * 60_000L));
-        assertEquals("1 Hour 5 Minutes",
+        assertEquals("45m", UsageReportMath.formatUsageDuration(45 * 60_000L));
+        assertEquals("1h", UsageReportMath.formatUsageDuration(60 * 60_000L));
+        assertEquals("1h 5m",
                 UsageReportMath.formatUsageDuration(65 * 60_000L));
-        assertEquals("Less than 1 Minute", UsageReportMath.formatUsageDuration(59_999L));
+        assertEquals("<1m", UsageReportMath.formatUsageDuration(59_999L));
     }
 
     @Test public void calculatesMondayStartOfWeekAcrossTimezone() {

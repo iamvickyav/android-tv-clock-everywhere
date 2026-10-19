@@ -145,33 +145,9 @@ final class UsageRepository {
                     0L,
                     now - Math.max(eventUsage[EVENT_SESSION_START], todayStart));
         }
-        long statsDuration = loadTodayDuration(foregroundPackage, todayStart, now);
-        long duration = Math.max(eventDuration, statsDuration);
         ApplicationInfo info = resolveApplication(foregroundPackage);
         String label = info == null ? foregroundPackage : loadLabel(info, foregroundPackage);
-        return new ForegroundUsage(label, foregroundPackage, duration);
-    }
-
-    private long loadTodayDuration(String packageName, long todayStart, long now) {
-        if (now <= todayStart) return 0L;
-        try {
-            List<UsageStats> stats = usageStatsManager.queryUsageStats(
-                    UsageStatsManager.INTERVAL_DAILY,
-                    todayStart,
-                    now);
-            long totalMillis = 0L;
-            if (stats != null) {
-                for (UsageStats usage : stats) {
-                    if (packageName.equals(usage.getPackageName())) {
-                        totalMillis += usage.getTotalTimeInForeground();
-                    }
-                }
-            }
-            return totalMillis;
-        } catch (RuntimeException e) {
-            Log.w(TAG, "Could not read today's usage for " + packageName + ".", e);
-            return 0L;
-        }
+        return new ForegroundUsage(label, foregroundPackage, eventDuration);
     }
 
     AppDetails loadAppDetails(String packageName) {

@@ -13,6 +13,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.WindowManager;
@@ -48,6 +49,9 @@ public class ClockOverlayService extends Service {
     private String clockPattern;
     private String clockTimeZone;
     private String usageTimeZoneId;
+    private String displayedUsagePackage;
+    private long displayedUsageMillis;
+    private long displayedUsageElapsedRealtime;
     private boolean viewAdded;
     private boolean usageRefreshPending;
     private volatile boolean destroyed;
@@ -117,7 +121,7 @@ public class ClockOverlayService extends Service {
 
             usageView = new TextView(this);
             usageView.setTextColor(Color.WHITE);
-            usageView.setTextSize(15);
+            usageView.setTextSize(18);
             usageView.setTypeface(Typeface.create("sans", Typeface.NORMAL));
             usageView.setShadowLayer(4f, 2f, 2f, Color.BLACK);
             usageView.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
@@ -131,7 +135,7 @@ public class ClockOverlayService extends Service {
             LinearLayout.LayoutParams usageParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);
-            usageParams.setMargins(0, 0, dp(12), 0);
+            usageParams.setMargins(0, 0, 0, 0);
             overlayView.addView(usageView, usageParams);
 
             clockView = new TextView(this);
@@ -236,8 +240,22 @@ public class ClockOverlayService extends Service {
                         hideUsage();
                         return;
                     }
+                    long elapsedRealtime = SystemClock.elapsedRealtime();
+                    if (result.packageName.equals(displayedUsagePackage)
+                            && result.todayMillis >= displayedUsageMillis) {
+                        long elapsedSinceSample = Math.max(
+                                0L,
+                                elapsedRealtime - displayedUsageElapsedRealtime);
+                        displayedUsageMillis = Math.max(
+                                result.todayMillis,
+                                displayedUsageMillis + elapsedSinceSample);
+                    } else {
+                        displayedUsagePackage = result.packageName;
+                        displayedUsageMillis = result.todayMillis;
+                    }
+                    displayedUsageElapsedRealtime = elapsedRealtime;
                     String display = result.label + " Running: "
-                            + UsageReportMath.formatUsageDuration(result.todayMillis);
+                            + UsageReportMath.formatUsageDuration(displayedUsageMillis) + " | ";
                     if (!display.equals(usageView.getText().toString())) usageView.setText(display);
                     usageView.setVisibility(android.view.View.VISIBLE);
                 });
@@ -246,6 +264,8 @@ public class ClockOverlayService extends Service {
     }
 
     private void hideUsage() {
+        displayedUsagePackage = null;
+        displayedUsageMillis = 0L;
         if (usageView != null && usageView.getVisibility() != android.view.View.GONE) {
             usageView.setVisibility(android.view.View.GONE);
         }

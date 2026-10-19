@@ -112,14 +112,14 @@ final class UsageReportMath {
     }
 
     static String formatUsageDuration(long durationMillis) {
-        if (durationMillis <= 0L) return "0 Minutes";
+        if (durationMillis <= 0L) return "0m";
         long totalMinutes = durationMillis / 60_000L;
-        if (totalMinutes == 0L) return "Less than 1 Minute";
+        if (totalMinutes == 0L) return "<1m";
         long hours = totalMinutes / 60L;
         long minutes = totalMinutes % 60L;
-        if (hours == 0L) return totalMinutes + (totalMinutes == 1L ? " Minute" : " Minutes");
-        String result = hours + (hours == 1L ? " Hour" : " Hours");
-        if (minutes > 0L) result += " " + minutes + (minutes == 1L ? " Minute" : " Minutes");
+        if (hours == 0L) return totalMinutes + "m";
+        String result = hours + "h";
+        if (minutes > 0L) result += " " + minutes + "m";
         return result;
     }
 

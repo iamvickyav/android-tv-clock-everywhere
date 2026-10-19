@@ -27,6 +27,7 @@ final class ClockPreferences {
         copyBoolean(source, editor, "enabled");
         copyBoolean(source, editor, "24_hour");
         copyBoolean(source, editor, "show_timezone");
+        copyBoolean(source, editor, "show_app_usage");
         String timezone = source.getString("timezone", null);
         if (timezone != null) editor.putString("timezone", timezone);
         editor.apply();

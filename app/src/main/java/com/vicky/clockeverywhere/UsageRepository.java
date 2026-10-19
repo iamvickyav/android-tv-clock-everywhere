@@ -52,19 +52,119 @@ final class UsageRepository {
         }
     }
 
-    WeekUsage loadCurrentWeek() {
+    PeriodUsage loadPeriod(UsageReportMath.Period period) {
         if (usageStatsManager == null) {
             throw new IllegalStateException("Android UsageStats service is unavailable on this TV.");
         }
         long now = System.currentTimeMillis();
-        long weekStart = UsageReportMath.startOfWeek(now, timeZone);
-        List<DayUsage> days = new ArrayList<>(7);
-        for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
-            long dayStart = UsageReportMath.addDays(weekStart, dayIndex, timeZone);
+        UsageReportMath.PeriodRange range = UsageReportMath.periodRange(period, now, timeZone);
+        List<DayUsage> days = new ArrayList<>();
+        for (long dayStart = range.startMillis;
+                dayStart < range.endDayExclusiveMillis;
+                dayStart = UsageReportMath.addDays(dayStart, 1, timeZone)) {
             days.add(loadDay(dayStart, now));
         }
-        UsageReportMath.WeekSummary summary = UsageReportMath.summarizeWeek(days, now, timeZone);
-        return new WeekUsage(days, summary);
+        UsageReportMath.PeriodSummary summary =
+                UsageReportMath.summarizePeriod(days, range.asOfMillis, timeZone);
+        return new PeriodUsage(
+                period,
+                range.startMillis,
+                range.endDayExclusiveMillis,
+                days,
+                summary,
+                UsageReportMath.aggregateApps(days));
+    }
+
+    DayUsage loadToday() {
+        long now = System.currentTimeMillis();
+        return loadDay(UsageReportMath.startOfDay(now, timeZone), now);
+    }
+
+    ForegroundUsage loadForegroundUsageToday() {
+        if (usageStatsManager == null || !hasUsageAccess(context)) return null;
+
+        long now = System.currentTimeMillis();
+        long todayStart = UsageReportMath.startOfDay(now, timeZone);
+        long eventStart = UsageReportMath.addDays(todayStart, -1, timeZone);
+        UsageEvents events;
+        try {
+            events = usageStatsManager.queryEvents(eventStart, now);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Could not read foreground app events.", e);
+            return null;
+        }
+        if (events == null) return null;
+
+        Map<String, EventUsage> eventUsages = new HashMap<>();
+        String foregroundPackage = null;
+        UsageEvents.Event event = new UsageEvents.Event();
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event);
+            String packageName = event.getPackageName();
+            if (packageName == null) continue;
+
+            int type = event.getEventType();
+            if (isForegroundEvent(type)) {
+                EventUsage usage = eventUsages.get(packageName);
+                if (usage == null) {
+                    usage = new EventUsage();
+                    eventUsages.put(packageName, usage);
+                }
+                if (usage.activeActivities == 0) usage.sessionStart = event.getTimeStamp();
+                usage.activeActivities++;
+                foregroundPackage = packageName;
+            } else if (isBackgroundEvent(type)) {
+                EventUsage usage = eventUsages.get(packageName);
+                if (usage != null && usage.activeActivities > 0) {
+                    usage.activeActivities--;
+                    if (usage.activeActivities == 0) {
+                        long sessionStart = Math.max(usage.sessionStart, todayStart);
+                        usage.totalMillis += Math.max(0L, event.getTimeStamp() - sessionStart);
+                        usage.sessionStart = 0L;
+                    }
+                }
+                if (packageName.equals(foregroundPackage)
+                        && (usage == null || usage.activeActivities == 0)) {
+                    foregroundPackage = null;
+                }
+            }
+        }
+
+        if (foregroundPackage == null || foregroundPackage.equals(context.getPackageName())) return null;
+        EventUsage eventUsage = eventUsages.get(foregroundPackage);
+        if (eventUsage == null) return null;
+
+        long eventDuration = eventUsage.totalMillis;
+        if (eventUsage.activeActivities > 0) {
+            eventDuration += Math.max(0L, now - Math.max(eventUsage.sessionStart, todayStart));
+        }
+        long statsDuration = loadTodayDuration(foregroundPackage, todayStart, now);
+        long duration = Math.max(eventDuration, statsDuration);
+        ApplicationInfo info = resolveApplication(foregroundPackage);
+        String label = info == null ? foregroundPackage : loadLabel(info, foregroundPackage);
+        return new ForegroundUsage(label, foregroundPackage, duration);
+    }
+
+    private long loadTodayDuration(String packageName, long todayStart, long now) {
+        if (now <= todayStart) return 0L;
+        try {
+            List<UsageStats> stats = usageStatsManager.queryUsageStats(
+                    UsageStatsManager.INTERVAL_DAILY,
+                    todayStart,
+                    now);
+            long totalMillis = 0L;
+            if (stats != null) {
+                for (UsageStats usage : stats) {
+                    if (packageName.equals(usage.getPackageName())) {
+                        totalMillis += usage.getTotalTimeInForeground();
+                    }
+                }
+            }
+            return totalMillis;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Could not read today's usage for " + packageName + ".", e);
+            return 0L;
+        }
     }
 
     AppDetails loadAppDetails(String packageName) {
@@ -294,13 +394,39 @@ final class UsageRepository {
         }
     }
 
-    static final class WeekUsage {
+    static final class PeriodUsage {
+        final UsageReportMath.Period period;
+        final long startMillis;
+        final long endDayExclusiveMillis;
         final List<DayUsage> days;
-        final UsageReportMath.WeekSummary summary;
+        final UsageReportMath.PeriodSummary summary;
+        final List<AppUsage> apps;
 
-        WeekUsage(List<DayUsage> days, UsageReportMath.WeekSummary summary) {
+        PeriodUsage(
+                UsageReportMath.Period period,
+                long startMillis,
+                long endDayExclusiveMillis,
+                List<DayUsage> days,
+                UsageReportMath.PeriodSummary summary,
+                List<AppUsage> apps) {
+            this.period = period;
+            this.startMillis = startMillis;
+            this.endDayExclusiveMillis = endDayExclusiveMillis;
             this.days = Collections.unmodifiableList(new ArrayList<>(days));
             this.summary = summary;
+            this.apps = Collections.unmodifiableList(new ArrayList<>(apps));
+        }
+    }
+
+    static final class ForegroundUsage {
+        final String label;
+        final String packageName;
+        final long todayMillis;
+
+        ForegroundUsage(String label, String packageName, long todayMillis) {
+            this.label = label;
+            this.packageName = packageName;
+            this.todayMillis = todayMillis;
         }
     }
 
@@ -343,6 +469,12 @@ final class UsageRepository {
             this.completedCount = completedCount;
             this.longestMillis = longestMillis;
             this.eventsAvailable = eventsAvailable;
+        }
+
+        private static final class EventUsage {
+            int activeActivities;
+            long sessionStart;
+            long totalMillis;
         }
     }
 }

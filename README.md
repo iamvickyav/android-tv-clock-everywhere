@@ -35,7 +35,8 @@ Stable release APKs will be published through GitHub Releases once the first rel
 - Click-through / non-touchable overlay.
 - Automatically starts after TV boot when enabled.
 - Starts from device-protected settings before the TV is unlocked (after the settings have been migrated on first launch/update).
-- On-demand daily and weekly app usage reports using Android UsageStats.
+- On-demand daily and calendar-based weekly/monthly app usage reports using Android UsageStats.
+- Optional foreground-app usage in the clock overlay, refreshed every eight seconds when enabled.
 - Settings are persisted locally on the TV.
 - Android TV launcher entry: **Clock Everywhere**.
 - Separate debug and release app identities for safe development and testing.
@@ -48,6 +49,8 @@ Stable release APKs will be published through GitHub Releases once the first rel
 
 ## App Usage Report
 
-Open **App Usage Report** in Clock Everywhere. The first time, choose **Open Usage Access Settings** and allow Usage Access for Clock Everywhere. The report reads Android-reported foreground usage when opened or refreshed; it does not run a tracking service. It includes today's app breakdown, this week's daily totals and summaries, and per-app usage details.
+Open **App Usage Report** in Clock Everywhere. The first time, choose **Open Usage Access Settings** and allow Usage Access for Clock Everywhere. The report reads Android-reported foreground usage when opened or refreshed; it does not run a tracking service. It includes today's app breakdown, current/previous calendar week and month totals, daily summaries, and per-app usage details.
+
+To show the current foreground app's accumulated usage for today in the overlay, enable **Show App Usage** in clock settings and allow Usage Access. This is off by default. Usage Access and Android TV firmware determine which foreground events and history are available; if the foreground app cannot be identified, the app usage portion stays hidden.
 
 Android TV settings labels vary by manufacturer. The Usage Access screen may be under **Settings → Apps → Special app access → Usage access**. If the direct button is not supported, open that page manually. Android or TV firmware may limit the available history or event details.

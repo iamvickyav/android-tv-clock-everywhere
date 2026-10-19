@@ -33,11 +33,13 @@ public class UsageReportActivity extends Activity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private LinearLayout content;
-    private UsageRepository.WeekUsage weekUsage;
+    private UsageRepository.PeriodUsage periodUsage;
+    private UsageRepository.DayUsage todayUsage;
     private UsageRepository.AppDetails selectedAppDetails;
     private UsageRepository repository;
     private String selectedPackage;
     private int selectedTab = TAB_TODAY;
+    private UsageReportMath.Period selectedPeriod = UsageReportMath.Period.CURRENT_WEEK;
     private int generation;
     private boolean destroyed;
 
@@ -72,22 +74,26 @@ public class UsageReportActivity extends Activity {
 
     private void refreshReport() {
         if (!UsageRepository.hasUsageAccess(this)) {
-            weekUsage = null;
+            periodUsage = null;
+            todayUsage = null;
             selectedPackage = null;
             renderAccessRequired();
             return;
         }
 
         int request = ++generation;
+        UsageReportMath.Period period = selectedPeriod;
         renderLoading("Loading usage report...");
         worker.execute(() -> {
             try {
                 UsageRepository repositoryForResult = new UsageRepository(getApplicationContext());
-                UsageRepository.WeekUsage report = repositoryForResult.loadCurrentWeek();
+                UsageRepository.PeriodUsage report = repositoryForResult.loadPeriod(period);
+                UsageRepository.DayUsage today = repositoryForResult.loadToday();
                 mainHandler.post(() -> {
                     if (destroyed || request != generation) return;
                     repository = repositoryForResult;
-                    weekUsage = report;
+                    periodUsage = report;
+                    todayUsage = today;
                     renderReport();
                 });
             } catch (RuntimeException e) {
@@ -113,7 +119,7 @@ public class UsageReportActivity extends Activity {
 
     private void renderAccessRequired() {
         beginPage("App Usage Report", "Usage Access is required to read Android's app usage history.");
-        addText("Clock Everywhere only reads usage data when you open this report. It does not track the screen or run a background monitor.",
+        addText("The report reads usage data only while open. The optional Show App Usage overlay reads the foreground app only when enabled.",
                 22, Color.LTGRAY, dp(24));
         addButton("Open Usage Access Settings", this::openUsageAccessSettings);
         addText("On the settings page, allow Usage Access for Clock Everywhere, then return here.",
@@ -147,7 +153,7 @@ public class UsageReportActivity extends Activity {
     }
 
     private void renderReport() {
-        if (weekUsage == null) {
+        if (periodUsage == null || todayUsage == null) {
             renderReportError();
             return;
         }
@@ -164,15 +170,18 @@ public class UsageReportActivity extends Activity {
         addButton("Refresh Usage Report", this::refreshReport);
         addTabs();
         if (selectedTab == TAB_TODAY) renderToday();
-        else if (selectedTab == TAB_WEEK) renderWeek();
-        else renderApps();
+        else {
+            addPeriodSelector();
+            if (selectedTab == TAB_WEEK) renderPeriod();
+            else renderApps();
+        }
     }
 
     private void addTabs() {
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         addTab(tabs, "Today", TAB_TODAY);
-        addTab(tabs, "This Week", TAB_WEEK);
+        addTab(tabs, "Period Summary", TAB_WEEK);
         addTab(tabs, "App Breakdown", TAB_APPS);
         LinearLayout.LayoutParams params = fullWidth();
         params.topMargin = dp(18);
@@ -196,8 +205,45 @@ public class UsageReportActivity extends Activity {
         tabs.addView(button, params);
     }
 
+    private void addPeriodSelector() {
+        LinearLayout periods = new LinearLayout(this);
+        periods.setOrientation(LinearLayout.HORIZONTAL);
+        addPeriodButton(periods, "Current Week", UsageReportMath.Period.CURRENT_WEEK);
+        addPeriodButton(periods, "Previous Week", UsageReportMath.Period.PREVIOUS_WEEK);
+        addPeriodButton(periods, "Current Month", UsageReportMath.Period.CURRENT_MONTH);
+        addPeriodButton(periods, "Previous Month", UsageReportMath.Period.PREVIOUS_MONTH);
+        LinearLayout.LayoutParams params = fullWidth();
+        params.topMargin = dp(12);
+        content.addView(periods, params);
+    }
+
+    private void addPeriodButton(
+            LinearLayout periods,
+            String label,
+            UsageReportMath.Period period) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setTextSize(15);
+        button.setMinHeight(dp(54));
+        button.setSelected(selectedPeriod == period);
+        if (selectedPeriod == period) button.setTextColor(Color.WHITE);
+        button.setOnClickListener(view -> {
+            if (selectedPeriod == period) return;
+            selectedPeriod = period;
+            selectedPackage = null;
+            selectedAppDetails = null;
+            refreshReport();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f);
+        params.setMargins(dp(2), 0, dp(2), 0);
+        periods.addView(button, params);
+    }
+
     private void renderToday() {
-        UsageRepository.DayUsage today = getToday();
+        UsageRepository.DayUsage today = todayUsage;
         addText("TOTAL TV TIME · APP FOREGROUND", 17, Color.LTGRAY, dp(14));
         addText(UsageReportMath.formatDuration(today.totalForegroundMillis), 38, Color.WHITE, dp(20));
         if (today.apps.isEmpty()) {
@@ -209,14 +255,15 @@ public class UsageReportActivity extends Activity {
         for (int index = 0; index < count; index++) addAppRow(today.apps.get(index));
     }
 
-    private void renderWeek() {
-        UsageReportMath.WeekSummary summary = weekUsage.summary;
-        addText("THIS WEEK", 22, Color.WHITE, dp(18));
-        for (UsageRepository.DayUsage day : weekUsage.days) {
+    private void renderPeriod() {
+        UsageReportMath.PeriodSummary summary = periodUsage.summary;
+        addText(periodLabel(selectedPeriod).toUpperCase(java.util.Locale.getDefault()), 22, Color.WHITE, dp(18));
+        for (UsageRepository.DayUsage day : periodUsage.days) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            TextView weekday = text(day.weekday, 21, Color.WHITE);
+            String date = DateFormat.getDateInstance(DateFormat.SHORT).format(new Date(day.startMillis));
+            TextView weekday = text(day.weekday + " " + date, 21, Color.WHITE);
             row.addView(weekday, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             TextView duration = text(UsageReportMath.formatDuration(day.totalForegroundMillis), 21, Color.WHITE);
             row.addView(duration);
@@ -232,16 +279,22 @@ public class UsageReportActivity extends Activity {
                 ? "—"
                 : summary.mostUsedDay.weekday + " (" + UsageReportMath.formatDuration(summary.mostUsedDay.totalForegroundMillis) + ")"),
                 20, Color.LTGRAY, dp(10));
+        if (!periodUsage.apps.isEmpty()) {
+            addText("Top apps", 21, Color.WHITE, dp(22));
+            for (int index = 0; index < Math.min(3, periodUsage.apps.size()); index++) {
+                addAppRow(periodUsage.apps.get(index));
+            }
+        }
     }
 
     private void renderApps() {
-        UsageRepository.DayUsage today = getToday();
-        if (today.apps.isEmpty()) {
-            addText("No app usage was reported for today yet.", 22, Color.LTGRAY, dp(20));
+        if (periodUsage.apps.isEmpty()) {
+            addText("No app usage was reported for this period.", 22, Color.LTGRAY, dp(20));
             return;
         }
-        addText("TODAY'S APPS", 22, Color.WHITE, dp(18));
-        for (UsageRepository.AppUsage app : today.apps) addAppRow(app);
+        addText(periodLabel(selectedPeriod).toUpperCase(java.util.Locale.getDefault()) + " APPS",
+                22, Color.WHITE, dp(18));
+        for (UsageRepository.AppUsage app : periodUsage.apps) addAppRow(app);
     }
 
     private void renderAppDetails() {
@@ -315,19 +368,14 @@ public class UsageReportActivity extends Activity {
         });
     }
 
-    private UsageRepository.DayUsage getToday() {
-        return weekUsage.days.get(weekUsage.days.size() - 1
-                - futureDaysAtEnd(weekUsage));
-    }
-
-    private int futureDaysAtEnd(UsageRepository.WeekUsage report) {
-        long todayStart = UsageReportMath.startOfDay(System.currentTimeMillis(), java.util.TimeZone.getDefault());
-        int count = 0;
-        for (int index = report.days.size() - 1; index >= 0; index--) {
-            if (report.days.get(index).startMillis > todayStart) count++;
-            else break;
+    private String periodLabel(UsageReportMath.Period period) {
+        switch (period) {
+            case CURRENT_WEEK: return "Current Week";
+            case PREVIOUS_WEEK: return "Previous Week";
+            case CURRENT_MONTH: return "Current Month";
+            case PREVIOUS_MONTH: return "Previous Month";
+            default: throw new IllegalArgumentException("Unknown usage period: " + period);
         }
-        return count;
     }
 
     private UsageRepository.AppUsage findApp(UsageRepository.DayUsage day, String packageName) {

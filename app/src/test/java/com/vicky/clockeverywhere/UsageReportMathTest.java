@@ -22,6 +22,16 @@ public class UsageReportMathTest {
         assertEquals("3h 6m", UsageReportMath.formatDuration(186 * 60_000L));
     }
 
+    @Test public void formatsForegroundUsageForTheOverlay() {
+        assertEquals("2 Hours 3 Minutes",
+                UsageReportMath.formatUsageDuration(2 * 60L * 60_000L + 3 * 60_000L));
+        assertEquals("45 Minutes", UsageReportMath.formatUsageDuration(45 * 60_000L));
+        assertEquals("1 Hour", UsageReportMath.formatUsageDuration(60 * 60_000L));
+        assertEquals("1 Hour 5 Minutes",
+                UsageReportMath.formatUsageDuration(65 * 60_000L));
+        assertEquals("Less than 1 Minute", UsageReportMath.formatUsageDuration(59_999L));
+    }
+
     @Test public void calculatesMondayStartOfWeekAcrossTimezone() {
         Calendar calendar = Calendar.getInstance(utc);
         calendar.clear();
@@ -33,6 +43,62 @@ public class UsageReportMathTest {
         assertEquals(Calendar.MONDAY, calendar.get(Calendar.DAY_OF_WEEK));
         assertEquals(0, calendar.get(Calendar.HOUR_OF_DAY));
         assertEquals(8, calendar.get(Calendar.DAY_OF_MONTH));
+    }
+
+    @Test public void currentAndPreviousWeekUseMondayCalendarBoundaries() {
+        long now = time(2026, Calendar.JANUARY, 1, 12, 30, utc);
+        UsageReportMath.PeriodRange current = UsageReportMath.periodRange(
+                UsageReportMath.Period.CURRENT_WEEK, now, utc);
+        UsageReportMath.PeriodRange previous = UsageReportMath.periodRange(
+                UsageReportMath.Period.PREVIOUS_WEEK, now, utc);
+
+        assertDate(current.startMillis, 2025, Calendar.DECEMBER, 29, utc);
+        assertDate(current.endDayExclusiveMillis, 2026, Calendar.JANUARY, 2, utc);
+        assertDate(previous.startMillis, 2025, Calendar.DECEMBER, 22, utc);
+        assertEquals(current.startMillis, previous.endDayExclusiveMillis);
+        assertEquals(now, current.asOfMillis);
+        assertEquals(current.startMillis - 1L, previous.asOfMillis);
+    }
+
+    @Test public void currentAndPreviousMonthRespectPartialCurrentDayAndYearChange() {
+        long now = time(2026, Calendar.JANUARY, 19, 16, 45, utc);
+        UsageReportMath.PeriodRange current = UsageReportMath.periodRange(
+                UsageReportMath.Period.CURRENT_MONTH, now, utc);
+        UsageReportMath.PeriodRange previous = UsageReportMath.periodRange(
+                UsageReportMath.Period.PREVIOUS_MONTH, now, utc);
+
+        assertDate(current.startMillis, 2026, Calendar.JANUARY, 1, utc);
+        assertDate(current.endDayExclusiveMillis, 2026, Calendar.JANUARY, 20, utc);
+        assertEquals(now, current.asOfMillis);
+        assertDate(previous.startMillis, 2025, Calendar.DECEMBER, 1, utc);
+        assertDate(previous.endDayExclusiveMillis, 2026, Calendar.JANUARY, 1, utc);
+        assertEquals(previous.endDayExclusiveMillis - 1L, previous.asOfMillis);
+        assertEquals(31L, (previous.endDayExclusiveMillis - previous.startMillis) / 86_400_000L);
+    }
+
+    @Test public void monthRangesHandleFebruaryLeapYearsAndThirtyDayMonths() {
+        long marchLeapYear = time(2024, Calendar.MARCH, 15, 12, 0, utc);
+        UsageReportMath.PeriodRange february = UsageReportMath.periodRange(
+                UsageReportMath.Period.PREVIOUS_MONTH, marchLeapYear, utc);
+        assertDate(february.startMillis, 2024, Calendar.FEBRUARY, 1, utc);
+        assertEquals(29L, (february.endDayExclusiveMillis - february.startMillis) / 86_400_000L);
+
+        long april = time(2025, Calendar.APRIL, 15, 12, 0, utc);
+        UsageReportMath.PeriodRange march = UsageReportMath.periodRange(
+                UsageReportMath.Period.PREVIOUS_MONTH, april, utc);
+        assertEquals(31L, (march.endDayExclusiveMillis - march.startMillis) / 86_400_000L);
+
+        long may = time(2025, Calendar.MAY, 15, 12, 0, utc);
+        UsageReportMath.PeriodRange aprilRange = UsageReportMath.periodRange(
+                UsageReportMath.Period.PREVIOUS_MONTH, may, utc);
+        assertEquals(30L, (aprilRange.endDayExclusiveMillis - aprilRange.startMillis) / 86_400_000L);
+    }
+
+    @Test public void weekStartsOnMondayForBothSundayAndMondayDates() {
+        long monday = time(2026, Calendar.JUNE, 8, 12, 0, utc);
+        long sunday = time(2026, Calendar.JUNE, 14, 12, 0, utc);
+        assertEquals(monday, UsageReportMath.startOfWeek(monday, utc));
+        assertEquals(monday, UsageReportMath.startOfWeek(sunday, utc));
     }
 
     @Test public void dayBoundariesFollowDaylightSavingChanges() {
@@ -62,7 +128,7 @@ public class UsageReportMathTest {
     }
 
     @Test public void emptyDataProducesZeroSummaryWithoutInventingTopAppOrDay() {
-        UsageReportMath.WeekSummary summary = UsageReportMath.summarizeWeek(
+        UsageReportMath.PeriodSummary summary = UsageReportMath.summarizePeriod(
                 Collections.emptyList(),
                 0L,
                 utc);
@@ -82,7 +148,7 @@ public class UsageReportMathTest {
                 app("YouTube", "tv.youtube", 60 * 60_000L),
                 60 * 60_000L);
         UsageRepository.DayUsage wednesdayUsage = day(wednesday, null, 0L);
-        UsageReportMath.WeekSummary summary = UsageReportMath.summarizeWeek(
+        UsageReportMath.PeriodSummary summary = UsageReportMath.summarizePeriod(
                 Arrays.asList(mondayUsage, tuesdayUsage, wednesdayUsage),
                 UsageReportMath.addDays(wednesday, 1, utc),
                 utc);
@@ -111,5 +177,20 @@ public class UsageReportMathTest {
         calendar.clear();
         calendar.set(year, month, day);
         return calendar.getTimeInMillis();
+    }
+
+    private long time(int year, int month, int day, int hour, int minute, TimeZone timeZone) {
+        Calendar calendar = Calendar.getInstance(timeZone);
+        calendar.clear();
+        calendar.set(year, month, day, hour, minute, 0);
+        return calendar.getTimeInMillis();
+    }
+
+    private void assertDate(long millis, int year, int month, int day, TimeZone timeZone) {
+        Calendar calendar = Calendar.getInstance(timeZone);
+        calendar.setTimeInMillis(millis);
+        assertEquals(year, calendar.get(Calendar.YEAR));
+        assertEquals(month, calendar.get(Calendar.MONTH));
+        assertEquals(day, calendar.get(Calendar.DAY_OF_MONTH));
     }
 }

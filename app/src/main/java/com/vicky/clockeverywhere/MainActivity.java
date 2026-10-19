@@ -30,12 +30,14 @@ public class MainActivity extends Activity {
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_24_HOUR = "24_hour";
     private static final String KEY_SHOW_TZ = "show_timezone";
+    private static final String KEY_SHOW_APP_USAGE = "show_app_usage";
     private static final String KEY_TIMEZONE = "timezone";
 
     private SharedPreferences prefs;
     private Switch enabledSwitch;
     private Switch formatSwitch;
     private Switch timezoneSwitch;
+    private Switch appUsageSwitch;
     private Spinner timezoneSpinner;
     private boolean waitingForOverlayPermission;
 
@@ -107,6 +109,13 @@ public class MainActivity extends Activity {
         root.addView(timezoneSwitch, fullWidth());
         timezoneSwitch.setOnCheckedChangeListener((b, checked) -> prefs.edit().putBoolean(KEY_SHOW_TZ, checked).apply());
 
+        appUsageSwitch = settingSwitch(
+                "Show App Usage",
+                prefs.getBoolean(KEY_SHOW_APP_USAGE, false));
+        root.addView(appUsageSwitch, fullWidth());
+        appUsageSwitch.setOnCheckedChangeListener(
+                (button, checked) -> prefs.edit().putBoolean(KEY_SHOW_APP_USAGE, checked).apply());
+
         TextView zoneLabel = text("Timezone", 17, Color.WHITE);
         zoneLabel.setPadding(0, dp(18), 0, dp(8));
         root.addView(zoneLabel, fullWidth());
@@ -136,7 +145,7 @@ public class MainActivity extends Activity {
         });
         root.addView(timezoneSpinner, fullWidth());
 
-        TextView note = text("The clock uses the selected timezone and updates every second.\nTimezone abbreviation is shown only when enabled.", 14, Color.GRAY);
+        TextView note = text("The clock uses the selected timezone and updates every second.\nTimezone abbreviation is shown only when enabled. App usage requires Usage Access.", 14, Color.GRAY);
         note.setPadding(0, dp(12), 0, 0);
         root.addView(note, fullWidth());
 
@@ -194,6 +203,7 @@ public class MainActivity extends Activity {
         boolean enabled = enabledSwitch != null && enabledSwitch.isChecked();
         if (formatSwitch != null) formatSwitch.setEnabled(enabled);
         if (timezoneSwitch != null) timezoneSwitch.setEnabled(enabled);
+        if (appUsageSwitch != null) appUsageSwitch.setEnabled(enabled);
         if (timezoneSpinner != null) timezoneSpinner.setEnabled(enabled);
     }
 

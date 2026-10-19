@@ -23,6 +23,9 @@ import java.util.TimeZone;
 
 final class UsageRepository {
     private static final String TAG = "UsageRepository";
+    private static final int EVENT_ACTIVE_ACTIVITIES = 0;
+    private static final int EVENT_SESSION_START = 1;
+    private static final int EVENT_TOTAL_MILLIS = 2;
 
     private final Context context;
     private final PackageManager packageManager;
@@ -95,7 +98,7 @@ final class UsageRepository {
         }
         if (events == null) return null;
 
-        Map<String, EventUsage> eventUsages = new HashMap<>();
+        Map<String, long[]> eventUsages = new HashMap<>();
         String foregroundPackage = null;
         UsageEvents.Event event = new UsageEvents.Event();
         while (events.hasNextEvent()) {
@@ -105,38 +108,42 @@ final class UsageRepository {
 
             int type = event.getEventType();
             if (isForegroundEvent(type)) {
-                EventUsage usage = eventUsages.get(packageName);
+                long[] usage = eventUsages.get(packageName);
                 if (usage == null) {
-                    usage = new EventUsage();
+                    usage = new long[3];
                     eventUsages.put(packageName, usage);
                 }
-                if (usage.activeActivities == 0) usage.sessionStart = event.getTimeStamp();
-                usage.activeActivities++;
+                if (usage[EVENT_ACTIVE_ACTIVITIES] == 0L) {
+                    usage[EVENT_SESSION_START] = event.getTimeStamp();
+                }
+                usage[EVENT_ACTIVE_ACTIVITIES]++;
                 foregroundPackage = packageName;
             } else if (isBackgroundEvent(type)) {
-                EventUsage usage = eventUsages.get(packageName);
-                if (usage != null && usage.activeActivities > 0) {
-                    usage.activeActivities--;
-                    if (usage.activeActivities == 0) {
-                        long sessionStart = Math.max(usage.sessionStart, todayStart);
-                        usage.totalMillis += Math.max(0L, event.getTimeStamp() - sessionStart);
-                        usage.sessionStart = 0L;
+                long[] usage = eventUsages.get(packageName);
+                if (usage != null && usage[EVENT_ACTIVE_ACTIVITIES] > 0L) {
+                    usage[EVENT_ACTIVE_ACTIVITIES]--;
+                    if (usage[EVENT_ACTIVE_ACTIVITIES] == 0L) {
+                        long sessionStart = Math.max(usage[EVENT_SESSION_START], todayStart);
+                        usage[EVENT_TOTAL_MILLIS] += Math.max(0L, event.getTimeStamp() - sessionStart);
+                        usage[EVENT_SESSION_START] = 0L;
                     }
                 }
                 if (packageName.equals(foregroundPackage)
-                        && (usage == null || usage.activeActivities == 0)) {
+                        && (usage == null || usage[EVENT_ACTIVE_ACTIVITIES] == 0L)) {
                     foregroundPackage = null;
                 }
             }
         }
 
         if (foregroundPackage == null || foregroundPackage.equals(context.getPackageName())) return null;
-        EventUsage eventUsage = eventUsages.get(foregroundPackage);
+        long[] eventUsage = eventUsages.get(foregroundPackage);
         if (eventUsage == null) return null;
 
-        long eventDuration = eventUsage.totalMillis;
-        if (eventUsage.activeActivities > 0) {
-            eventDuration += Math.max(0L, now - Math.max(eventUsage.sessionStart, todayStart));
+        long eventDuration = eventUsage[EVENT_TOTAL_MILLIS];
+        if (eventUsage[EVENT_ACTIVE_ACTIVITIES] > 0L) {
+            eventDuration += Math.max(
+                    0L,
+                    now - Math.max(eventUsage[EVENT_SESSION_START], todayStart));
         }
         long statsDuration = loadTodayDuration(foregroundPackage, todayStart, now);
         long duration = Math.max(eventDuration, statsDuration);
@@ -472,9 +479,4 @@ final class UsageRepository {
         }
     }
 
-    private static final class EventUsage {
-        int activeActivities;
-        long sessionStart;
-        long totalMillis;
-    }
 }

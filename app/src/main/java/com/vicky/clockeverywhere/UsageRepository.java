@@ -470,11 +470,11 @@ final class UsageRepository {
             this.longestMillis = longestMillis;
             this.eventsAvailable = eventsAvailable;
         }
+    }
 
-        private static final class EventUsage {
-            int activeActivities;
-            long sessionStart;
-            long totalMillis;
-        }
+    private static final class EventUsage {
+        int activeActivities;
+        long sessionStart;
+        long totalMillis;
     }
 }

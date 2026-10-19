@@ -35,6 +35,7 @@ Stable release APKs will be published through GitHub Releases once the first rel
 - Click-through / non-touchable overlay.
 - Automatically starts after TV boot when enabled.
 - Starts from device-protected settings before the TV is unlocked (after the settings have been migrated on first launch/update).
+- On-demand daily and weekly app usage reports using Android UsageStats.
 - Settings are persisted locally on the TV.
 - Android TV launcher entry: **Clock Everywhere**.
 - Separate debug and release app identities for safe development and testing.
@@ -44,3 +45,9 @@ Stable release APKs will be published through GitHub Releases once the first rel
 - Hourly highlight: subtle glow/color animation for 10 seconds at `HH:00:00`.
 - Configurable clock size/position.
 - Additional display options as needed.
+
+## App Usage Report
+
+Open **App Usage Report** in Clock Everywhere. The first time, choose **Open Usage Access Settings** and allow Usage Access for Clock Everywhere. The report reads Android-reported foreground usage when opened or refreshed; it does not run a tracking service. It includes today's app breakdown, this week's daily totals and summaries, and per-app usage details.
+
+Android TV settings labels vary by manufacturer. The Usage Access screen may be under **Settings → Apps → Special app access → Usage access**. If the direct button is not supported, open that page manually. Android or TV firmware may limit the available history or event details.

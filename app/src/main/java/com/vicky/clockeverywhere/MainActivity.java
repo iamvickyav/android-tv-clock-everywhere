@@ -11,6 +11,7 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -83,6 +84,16 @@ public class MainActivity extends Activity {
             }
             updateSettingsEnabled();
         });
+
+        Button usageReportButton = new Button(this);
+        usageReportButton.setText("App Usage Report");
+        usageReportButton.setTextSize(20);
+        usageReportButton.setMinHeight(dp(64));
+        usageReportButton.setOnClickListener(view ->
+                startActivity(new Intent(this, UsageReportActivity.class)));
+        LinearLayout.LayoutParams reportButtonParams = fullWidth();
+        reportButtonParams.topMargin = dp(18);
+        root.addView(usageReportButton, reportButtonParams);
 
         TextView divider = text("CLOCK SETTINGS", 13, Color.GRAY);
         divider.setPadding(0, dp(28), 0, dp(10));

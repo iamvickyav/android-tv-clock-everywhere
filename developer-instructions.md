@@ -24,7 +24,7 @@ Security patch: 2022-08-05
 | Minimum Android | Android 8.0 (API 26) |
 | Recommended / tested device | Android 10 (API 29) |
 | Compile SDK | API 35 |
-| Current target SDK | API 28 |
+| Current target SDK | API 34 |
 
 `minSdk = 26` is the minimum supported version. Do not raise it without an explicit product decision.
 
@@ -35,6 +35,9 @@ Core components include:
 - `MainActivity` — settings/configuration UI.
 - `ClockOverlayService` — owns the always-on-top clock overlay.
 - `BootReceiver` — handles boot broadcasts and starts the overlay when the app is enabled and the overlay permission is available.
+- `UsageReportActivity` — on-demand daily, weekly, and app-detail usage report UI.
+- `UsageRepository` — queries Android `UsageStatsManager` and usage events, independently of the clock overlay.
+- `UsageReportMath` — local day/week boundaries, duration formatting, app sorting/filtering, and weekly aggregation.
 - Android manifest — declares the overlay permission, boot receiver, service, and Android TV launcher entry.
 
 The app should not open its settings Activity automatically at TV boot. Boot should start the overlay service only when configured to do so.
@@ -42,6 +45,16 @@ The app should not open its settings Activity automatically at TV boot. Boot sho
 The overlay should remain click-through/non-touchable so it does not interfere with the application underneath it.
 
 The overlay requires Android's `SYSTEM_ALERT_WINDOW` / Display over other apps permission.
+
+### App usage reports
+
+`UsageRepository` checks `AppOpsManager.OPSTR_GET_USAGE_STATS` and queries `UsageStatsManager.queryUsageStats(INTERVAL_DAILY, ...)` only when the report UI opens or is refreshed. It does not persist data, poll, run a service, or keep the TV awake. `UsageStats.getTotalTimeInForeground()` supplies app and daily totals. The report uses TV-local calendar day boundaries, including daylight-saving changes, and excludes the Clock Everywhere package. Non-launchable system packages are filtered, while system apps with a launcher/Leanback entry remain eligible.
+
+The manifest declares `PACKAGE_USAGE_STATS`; the user must grant **Usage Access** through Android Settings. The `QUERY_ALL_PACKAGES` declaration allows usage package names to be resolved to app names and icons on Android 11+; this broad package-visibility permission may require additional policy justification for Google Play distribution. This project is intended for personal sideloading.
+
+Weekly totals sum Android-reported app foreground durations; simultaneous/overlapping foreground accounting can make the total exceed elapsed TV-on time. UsageStats may lag for an app still in the foreground until Android records its next transition. App-detail session counts and longest duration use only paired foreground/background UsageEvents in the query range. Incomplete, truncated, or ambiguous sessions are excluded, so those metrics are best-effort rather than a complete audit. Usage history and the Usage Access settings page can vary by TV manufacturer.
+
+`UsageReportMathTest` covers duration formatting, timezone/day/week boundaries, daylight-saving day lengths, app sorting/filtering, empty data, and weekly aggregation. Verify access granted/denied, returning from Settings, app usage totals, week/day rollover, app details, and firmware behavior on target TVs.
 
 ## TV launcher assets
 

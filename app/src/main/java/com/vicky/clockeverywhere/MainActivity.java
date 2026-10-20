@@ -1,6 +1,7 @@
 package com.vicky.clockeverywhere;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -8,10 +9,12 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -116,6 +119,40 @@ public class MainActivity extends Activity {
         appUsageSwitch.setOnCheckedChangeListener(
                 (button, checked) -> prefs.edit().putBoolean(KEY_SHOW_APP_USAGE, checked).apply());
 
+        TextView limitsHeader = text("USAGE LIMITS", 13, Color.GRAY);
+        limitsHeader.setPadding(0, dp(28), 0, dp(10));
+        root.addView(limitsHeader, fullWidth());
+
+        Button tvLimitButton = new Button(this);
+        tvLimitButton.setText(tvLimitLabel());
+        tvLimitButton.setTextSize(19);
+        tvLimitButton.setMinHeight(dp(60));
+        tvLimitButton.setOnClickListener(view -> showLimitDialog(
+                "Overall TV Usage Limit",
+                UsageLimits.KEY_TV_LIMIT_MINUTES,
+                UsageLimits.getTvLimitMinutes(prefs),
+                minutes -> tvLimitButton.setText(tvLimitLabel())));
+        root.addView(tvLimitButton, fullWidth());
+
+        Button appLimitButton = new Button(this);
+        appLimitButton.setText(appLimitLabel());
+        appLimitButton.setTextSize(19);
+        appLimitButton.setMinHeight(dp(60));
+        appLimitButton.setOnClickListener(view -> showLimitDialog(
+                "App Usage Limit",
+                UsageLimits.KEY_APP_LIMIT_MINUTES,
+                UsageLimits.getAppLimitMinutes(prefs),
+                minutes -> appLimitButton.setText(appLimitLabel())));
+        LinearLayout.LayoutParams appLimitParams = fullWidth();
+        appLimitParams.topMargin = dp(8);
+        root.addView(appLimitButton, appLimitParams);
+
+        TextView limitsNote = text(
+                "Default limits: TV 3 hours, each app 2 hours. Approaching means 80% of the configured limit.",
+                14, Color.GRAY);
+        limitsNote.setPadding(0, dp(10), 0, 0);
+        root.addView(limitsNote, fullWidth());
+
         TextView zoneLabel = text("Timezone", 17, Color.WHITE);
         zoneLabel.setPadding(0, dp(18), 0, dp(8));
         root.addView(zoneLabel, fullWidth());
@@ -154,11 +191,57 @@ public class MainActivity extends Activity {
         enabledSwitch.requestFocus();
     }
 
+    private String tvLimitLabel() {
+        return "Overall TV Usage Limit: " + formatLimit(UsageLimits.getTvLimitMinutes(prefs));
+    }
+
+    private String appLimitLabel() {
+        return "App Usage Limit: " + formatLimit(UsageLimits.getAppLimitMinutes(prefs));
+    }
+
+    private String formatLimit(int minutes) {
+        if (minutes % 60 == 0) return (minutes / 60) + " hour" + (minutes == 60 ? "" : "s");
+        return (minutes / 60) + "h " + (minutes % 60) + "m";
+    }
+
+    private interface LimitSavedListener { void onSaved(int minutes); }
+
+    private void showLimitDialog(String title, String key, int currentMinutes, LimitSavedListener listener) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(currentMinutes));
+        input.setSelectAllOnFocus(true);
+        input.setHint("Minutes");
+        int padding = dp(24);
+        input.setPadding(padding, dp(8), padding, dp(8));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage("Enter the limit in minutes.")
+                .setView(input)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", null)
+                .create();
+
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            String value = input.getText().toString().trim();
+            try {
+                int minutes = Integer.parseInt(value);
+                if (minutes < 1 || minutes > 1440) throw new NumberFormatException();
+                prefs.edit().putInt(key, minutes).apply();
+                listener.onSaved(minutes);
+                dialog.dismiss();
+            } catch (NumberFormatException e) {
+                input.setError("Enter a value between 1 and 1440 minutes");
+            }
+        }));
+        dialog.show();
+    }
+
     private void openOverlaySettings() {
         Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
         try {
-            // Xiaomi/Android TV firmware may not implement the package-specific
-            // overlay settings Activity. Try the TV-safe generic screen first.
             startActivityForResult(intent, REQUEST_OVERLAY);
         } catch (Exception genericFailure) {
             try {

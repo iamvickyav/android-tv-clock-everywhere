@@ -28,6 +28,8 @@ final class ClockPreferences {
         copyBoolean(source, editor, "24_hour");
         copyBoolean(source, editor, "show_timezone");
         copyBoolean(source, editor, "show_app_usage");
+        copyInt(source, editor, UsageLimits.KEY_TV_LIMIT_MINUTES);
+        copyInt(source, editor, UsageLimits.KEY_APP_LIMIT_MINUTES);
         String timezone = source.getString("timezone", null);
         if (timezone != null) editor.putString("timezone", timezone);
         editor.apply();
@@ -35,5 +37,9 @@ final class ClockPreferences {
 
     private static void copyBoolean(SharedPreferences source, SharedPreferences.Editor destination, String key) {
         if (source.contains(key)) destination.putBoolean(key, source.getBoolean(key, false));
+    }
+
+    private static void copyInt(SharedPreferences source, SharedPreferences.Editor destination, String key) {
+        if (source.contains(key)) destination.putInt(key, source.getInt(key, 0));
     }
 }

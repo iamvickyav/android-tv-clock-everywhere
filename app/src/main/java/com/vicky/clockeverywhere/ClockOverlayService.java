@@ -52,6 +52,8 @@ public class ClockOverlayService extends Service {
     private String displayedUsagePackage;
     private long displayedUsageMillis;
     private long displayedUsageElapsedRealtime;
+    private long displayedTotalTvMillis;
+    private long displayedTotalTvSampleElapsedRealtime;
     private boolean viewAdded;
     private boolean usageRefreshPending;
     private volatile boolean destroyed;
@@ -93,9 +95,13 @@ public class ClockOverlayService extends Service {
 
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener =
             (sharedPreferences, key) -> {
-                if (!KEY_SHOW_APP_USAGE.equals(key) || usageView == null) return;
-                if (prefs.getBoolean(KEY_SHOW_APP_USAGE, false)) refreshForegroundUsage();
-                else hideUsage();
+                if (usageView == null) return;
+                if (KEY_SHOW_APP_USAGE.equals(key)
+                        || UsageLimits.KEY_TV_LIMIT_MINUTES.equals(key)
+                        || UsageLimits.KEY_APP_LIMIT_MINUTES.equals(key)) {
+                    if (prefs.getBoolean(KEY_SHOW_APP_USAGE, false)) refreshForegroundUsage();
+                    else hideUsage();
+                }
             };
 
     @Override public void onCreate() {
@@ -126,7 +132,7 @@ public class ClockOverlayService extends Service {
             usageView.setShadowLayer(4f, 2f, 2f, Color.BLACK);
             usageView.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
             usageView.setSingleLine(true);
-            usageView.setMaxWidth(dp(650));
+            usageView.setMaxWidth(dp(700));
             usageView.setEllipsize(android.text.TextUtils.TruncateAt.END);
             usageView.setVisibility(android.view.View.GONE);
             usageView.setClickable(false);
@@ -219,6 +225,7 @@ public class ClockOverlayService extends Service {
         usageRefreshPending = true;
         usageExecutor.execute(() -> {
             UsageRepository.ForegroundUsage usage;
+            UsageRepository.DayUsage today;
             try {
                 String currentTimeZoneId = TimeZone.getDefault().getID();
                 if (usageRepository == null || !currentTimeZoneId.equals(usageTimeZoneId)) {
@@ -226,20 +233,24 @@ public class ClockOverlayService extends Service {
                     usageTimeZoneId = currentTimeZoneId;
                 }
                 usage = usageRepository.loadForegroundUsageToday();
+                today = usageRepository.loadToday();
             } catch (RuntimeException e) {
                 android.util.Log.w("ClockOverlayService", "Could not refresh foreground app usage.", e);
                 usage = null;
+                today = null;
             }
             UsageRepository.ForegroundUsage result = usage;
+            UsageRepository.DayUsage todayResult = today;
             if (!destroyed) {
                 handler.post(() -> {
                     usageRefreshPending = false;
                     if (!viewAdded || usageView == null
                             || !prefs.getBoolean(KEY_SHOW_APP_USAGE, false)) return;
-                    if (result == null) {
+                    if (result == null || todayResult == null) {
                         hideUsage();
                         return;
                     }
+
                     long elapsedRealtime = SystemClock.elapsedRealtime();
                     if (result.packageName.equals(displayedUsagePackage)
                             && result.todayMillis >= displayedUsageMillis) {
@@ -254,8 +265,28 @@ public class ClockOverlayService extends Service {
                         displayedUsageMillis = result.todayMillis;
                     }
                     displayedUsageElapsedRealtime = elapsedRealtime;
-                    String display = result.label + " Running: "
-                            + UsageReportMath.formatUsageDuration(displayedUsageMillis) + " | ";
+
+                    if (todayResult.totalForegroundMillis >= displayedTotalTvMillis) {
+                        long elapsedSinceTotalSample = Math.max(
+                                0L,
+                                elapsedRealtime - displayedTotalTvSampleElapsedRealtime);
+                        displayedTotalTvMillis = Math.max(
+                                todayResult.totalForegroundMillis,
+                                displayedTotalTvMillis + (displayedTotalTvSampleElapsedRealtime == 0L
+                                        ? 0L : elapsedSinceTotalSample));
+                    } else {
+                        displayedTotalTvMillis = todayResult.totalForegroundMillis;
+                    }
+                    displayedTotalTvSampleElapsedRealtime = elapsedRealtime;
+
+                    int appLimit = UsageLimits.getAppLimitMinutes(prefs);
+                    int tvLimit = UsageLimits.getTvLimitMinutes(prefs);
+                    String appStatus = UsageLimits.status(displayedUsageMillis, appLimit);
+                    String tvStatus = UsageLimits.status(displayedTotalTvMillis, tvLimit);
+                    String display = result.label + " Usage: "
+                            + UsageReportMath.formatUsageDuration(displayedUsageMillis)
+                            + " " + appStatus + " | "
+                            + clockTextNow() + " " + tvStatus;
                     if (!display.equals(usageView.getText().toString())) usageView.setText(display);
                     usageView.setVisibility(android.view.View.VISIBLE);
                 });
@@ -263,9 +294,20 @@ public class ClockOverlayService extends Service {
         });
     }
 
+    private String clockTextNow() {
+        String pattern = prefs.getBoolean(KEY_24_HOUR, true) ? "HH:mm:ss" : "hh:mm:ss a";
+        if (prefs.getBoolean(KEY_SHOW_TZ, false)) pattern += " z";
+        String zoneId = prefs.getString(KEY_TIMEZONE, "Asia/Kolkata");
+        SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.getDefault());
+        format.setTimeZone(TimeZone.getTimeZone(zoneId));
+        return format.format(new Date());
+    }
+
     private void hideUsage() {
         displayedUsagePackage = null;
         displayedUsageMillis = 0L;
+        displayedTotalTvMillis = 0L;
+        displayedTotalTvSampleElapsedRealtime = 0L;
         if (usageView != null && usageView.getVisibility() != android.view.View.GONE) {
             usageView.setVisibility(android.view.View.GONE);
         }

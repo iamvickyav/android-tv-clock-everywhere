@@ -3,6 +3,7 @@ package com.vicky.clockeverywhere;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -13,7 +14,6 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -42,9 +42,11 @@ public class UsageReportActivity extends Activity {
     private UsageReportMath.Period selectedPeriod = UsageReportMath.Period.CURRENT_WEEK;
     private int generation;
     private boolean destroyed;
+    private SharedPreferences prefs;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        prefs = ClockPreferences.get(this);
         renderLoading("Checking Usage Access...");
     }
 
@@ -139,7 +141,6 @@ public class UsageReportActivity extends Activity {
         beginPage("App Usage Report", "Android could not provide usage data.");
         addText("Check Usage Access in system settings, then retry. Some TV firmware may restrict usage reporting.",
                 20, Color.LTGRAY, dp(20));
-        addText("Check Usage Access in system settings and try again.", 18, Color.GRAY, dp(16));
         addButton("Open Usage Access Settings", this::openUsageAccessSettings);
         addButton("Retry", this::refreshReport);
         if (selectedPackage != null) {
@@ -217,10 +218,7 @@ public class UsageReportActivity extends Activity {
         content.addView(periods, params);
     }
 
-    private void addPeriodButton(
-            LinearLayout periods,
-            String label,
-            UsageReportMath.Period period) {
+    private void addPeriodButton(LinearLayout periods, String label, UsageReportMath.Period period) {
         Button button = new Button(this);
         button.setText(label);
         button.setTextSize(15);
@@ -234,18 +232,18 @@ public class UsageReportActivity extends Activity {
             selectedAppDetails = null;
             refreshReport();
         });
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         params.setMargins(dp(2), 0, dp(2), 0);
         periods.addView(button, params);
     }
 
     private void renderToday() {
         UsageRepository.DayUsage today = todayUsage;
+        int tvLimit = UsageLimits.getTvLimitMinutes(prefs);
+        String tvStatus = UsageLimits.status(today.totalForegroundMillis, tvLimit);
         addText("TOTAL TV TIME · APP FOREGROUND", 17, Color.LTGRAY, dp(14));
-        addText(UsageReportMath.formatDuration(today.totalForegroundMillis), 38, Color.WHITE, dp(20));
+        addText(UsageReportMath.formatDuration(today.totalForegroundMillis) + " " + tvStatus, 38, Color.WHITE, dp(20));
+        addText("Limit: " + formatLimit(tvLimit), 18, Color.GRAY, dp(4));
         if (today.apps.isEmpty()) {
             addText("No app usage was reported for today yet.", 22, Color.LTGRAY, dp(20));
             return;
@@ -281,9 +279,7 @@ public class UsageReportActivity extends Activity {
                 20, Color.LTGRAY, dp(10));
         if (!periodUsage.apps.isEmpty()) {
             addText("Top apps", 21, Color.WHITE, dp(22));
-            for (int index = 0; index < Math.min(3, periodUsage.apps.size()); index++) {
-                addAppRow(periodUsage.apps.get(index));
-            }
+            for (int index = 0; index < Math.min(3, periodUsage.apps.size()); index++) addAppRow(periodUsage.apps.get(index));
         }
     }
 
@@ -292,8 +288,7 @@ public class UsageReportActivity extends Activity {
             addText("No app usage was reported for this period.", 22, Color.LTGRAY, dp(20));
             return;
         }
-        addText(periodLabel(selectedPeriod).toUpperCase(java.util.Locale.getDefault()) + " APPS",
-                22, Color.WHITE, dp(18));
+        addText(periodLabel(selectedPeriod).toUpperCase(java.util.Locale.getDefault()) + " APPS", 22, Color.WHITE, dp(18));
         for (UsageRepository.AppUsage app : periodUsage.apps) addAppRow(app);
     }
 
@@ -303,9 +298,12 @@ public class UsageReportActivity extends Activity {
             return;
         }
         UsageRepository.AppDetails details = selectedAppDetails;
+        int appLimit = UsageLimits.getAppLimitMinutes(prefs);
         addText(details.label, 30, Color.WHITE, dp(8));
         addText(details.packageName, 15, Color.GRAY, dp(12));
-        addText("Today: " + UsageReportMath.formatDuration(details.todayMillis), 24, Color.WHITE, dp(14));
+        addText("Today: " + UsageReportMath.formatDuration(details.todayMillis) + " "
+                + UsageLimits.status(details.todayMillis, appLimit), 24, Color.WHITE, dp(14));
+        addText("App limit: " + formatLimit(appLimit), 18, Color.GRAY, dp(4));
         addText("Past 7 days (including today): " + UsageReportMath.formatDuration(details.previousSevenDayMillis), 22, Color.LTGRAY, dp(12));
         addText("DAILY USAGE", 19, Color.WHITE, dp(24));
         for (UsageRepository.DayUsage day : details.days) {
@@ -315,11 +313,9 @@ public class UsageReportActivity extends Activity {
                     + "   " + UsageReportMath.formatDuration(duration), 20, Color.LTGRAY, dp(8));
         }
         addText("Completed recorded sessions: " + (details.sessionEventsAvailable
-                ? String.valueOf(details.completedSessions)
-                : "unavailable"), 19, Color.LTGRAY, dp(22));
+                ? String.valueOf(details.completedSessions) : "unavailable"), 19, Color.LTGRAY, dp(22));
         addText("Longest completed recorded session: " + (details.sessionEventsAvailable
-                ? UsageReportMath.formatDuration(details.longestCompletedSessionMillis)
-                : "unavailable"), 19, Color.LTGRAY, dp(8));
+                ? UsageReportMath.formatDuration(details.longestCompletedSessionMillis) : "unavailable"), 19, Color.LTGRAY, dp(8));
         addText("Session counts use paired Android foreground/background events only. Incomplete or ambiguous sessions are excluded.",
                 16, Color.GRAY, dp(16));
         addButton("Back to App Breakdown", () -> {
@@ -331,7 +327,8 @@ public class UsageReportActivity extends Activity {
 
     private void addAppRow(UsageRepository.AppUsage app) {
         Button row = new Button(this);
-        row.setText(app.label + "\n" + UsageReportMath.formatDuration(app.foregroundMillis));
+        String status = UsageLimits.status(app.foregroundMillis, UsageLimits.getAppLimitMinutes(prefs));
+        row.setText(app.label + "\n" + UsageReportMath.formatDuration(app.foregroundMillis) + " " + status);
         row.setTextSize(20);
         row.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         row.setMinHeight(dp(82));
@@ -368,6 +365,11 @@ public class UsageReportActivity extends Activity {
         });
     }
 
+    private String formatLimit(int minutes) {
+        if (minutes % 60 == 0) return (minutes / 60) + "h";
+        return (minutes / 60) + "h " + (minutes % 60) + "m";
+    }
+
     private String periodLabel(UsageReportMath.Period period) {
         switch (period) {
             case CURRENT_WEEK: return "Current Week";
@@ -379,9 +381,7 @@ public class UsageReportActivity extends Activity {
     }
 
     private UsageRepository.AppUsage findApp(UsageRepository.DayUsage day, String packageName) {
-        for (UsageRepository.AppUsage app : day.apps) {
-            if (app.packageName.equals(packageName)) return app;
-        }
+        for (UsageRepository.AppUsage app : day.apps) if (app.packageName.equals(packageName)) return app;
         return null;
     }
 
@@ -392,13 +392,11 @@ public class UsageReportActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(48), dp(28), dp(48), dp(32));
         scrollView.addView(root);
-
         TextView heading = text(title, 32, Color.WHITE);
         root.addView(heading, fullWidth());
         TextView subheading = text(subtitle, 18, Color.LTGRAY);
         subheading.setPadding(0, dp(6), 0, dp(14));
         root.addView(subheading, fullWidth());
-
         content = root;
         setContentView(scrollView);
     }
@@ -436,12 +434,8 @@ public class UsageReportActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams fullWidth() {
-        return new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
+        return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
     }
 
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
-    }
+    private int dp(int value) { return (int) (value * getResources().getDisplayMetrics().density + 0.5f); }
 }

@@ -2,6 +2,9 @@
 
 A lightweight Android TV clock overlay that stays visible above every other app.
 
+<img width="800" height="576" alt="WhatsApp Image 2026-10-20 at 21 51 44" src="https://github.com/user-attachments/assets/b6ad1094-e188-4985-a8db-5b934fb455ae" />
+<img width="800" height="576" alt="WhatsApp Image 2026-10-20 at 21 51 45" src="https://github.com/user-attachments/assets/af38086d-96da-4071-9c5a-c0e317a10c2b" />
+
 ## Download
 
 ### Latest debug build

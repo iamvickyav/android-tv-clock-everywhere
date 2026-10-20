@@ -285,22 +285,12 @@ public class ClockOverlayService extends Service {
                     String tvStatus = UsageLimits.status(displayedTotalTvMillis, tvLimit);
                     String display = result.label + " Usage: "
                             + UsageReportMath.formatUsageDuration(displayedUsageMillis)
-                            + " " + appStatus + " | "
-                            + clockTextNow() + " " + tvStatus;
+                            + " " + appStatus + " | " + tvStatus;
                     if (!display.equals(usageView.getText().toString())) usageView.setText(display);
                     usageView.setVisibility(android.view.View.VISIBLE);
                 });
             }
         });
-    }
-
-    private String clockTextNow() {
-        String pattern = prefs.getBoolean(KEY_24_HOUR, true) ? "HH:mm:ss" : "hh:mm:ss a";
-        if (prefs.getBoolean(KEY_SHOW_TZ, false)) pattern += " z";
-        String zoneId = prefs.getString(KEY_TIMEZONE, "Asia/Kolkata");
-        SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.getDefault());
-        format.setTimeZone(TimeZone.getTimeZone(zoneId));
-        return format.format(new Date());
     }
 
     private void hideUsage() {
